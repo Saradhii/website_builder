@@ -4,7 +4,6 @@ import React, { useState, FormEvent, ChangeEvent } from 'react';
 
 const CustomForm: React.FC = () => {
   const [inputValue, setInputValue] = useState<string>('');
-
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log('Form submitted with input:', inputValue);
