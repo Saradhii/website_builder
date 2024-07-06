@@ -7,8 +7,8 @@ const CustomForm: React.FC = () => {
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log('Form submitted with input:', inputValue);
-    // You can add more logic here, like sending the data to a server
-    setInputValue(''); // Clear the input after submission
+    
+    setInputValue(''); 
   };
 
   const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
