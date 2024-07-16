@@ -7,7 +7,6 @@ const CustomForm: React.FC = () => {
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log('Form submitted with input:', inputValue);
-    
     setInputValue(''); 
   };
 
