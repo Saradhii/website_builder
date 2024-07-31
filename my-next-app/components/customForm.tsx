@@ -9,7 +9,6 @@ const CustomForm: React.FC = () => {
     console.log('Form submitted with input:', inputValue);
     setInputValue(''); 
   };
-
   const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setInputValue(e.target.value);
   };
