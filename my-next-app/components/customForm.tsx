@@ -7,6 +7,12 @@ const CustomForm: React.FC = () => {
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log('Form submitted with input:', inputValue);
+    try{
+      const response = axios.post('/generateContent', { content: inputValue });
+      console.log(response);
+    }catch(err){
+      console.log("error generating content",err);
+    }
     setInputValue(''); 
   };
   const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
