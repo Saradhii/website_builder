@@ -3,14 +3,17 @@ import Image from "next/image";
 import ChatForm from "@/components/chatForm";
 import UserInput from "@/components/userInput";
 import CustomForm from "@/components/customForm";
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Content, GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
 import React, { useState, FormEvent, ChangeEvent } from 'react';
+import { marked } from "marked";
 
 export default function Home() {
   const [inputValue, setInputValue] = useState<string>('');
-
   const [lllmResponse, setLLLMResponse] = useState<string>('');
+  const [htmlToRender, setHtmlToRender] = useState<string>('');
+  const [textContent, setTextContent] = useState<string>('');
+  const [history,setHistory] = useState<any[]>([]);
 
   const apiKey = process.env.GEMINI_API_KEY;
   const genAI = new GoogleGenerativeAI(`${apiKey}`);
@@ -33,11 +36,18 @@ export default function Home() {
     try {
       const chatSession = model.startChat({
         generationConfig,
-        history: [
-        ],
+        history: history,
       });
       const result = await chatSession.sendMessage(inputValue);
       setLLLMResponse(result.response.text());
+      // setHistory([...history, result.response]);
+      const htmlRegex = /```html([^`]*)```/g;
+      let match;
+      while ((match = htmlRegex.exec(lllmResponse)) !== null) {
+        setHtmlToRender(match[1]);
+      }
+      const plainTextRegex = /```[^`]*```/g;
+      setTextContent(lllmResponse.replace(plainTextRegex, '').trim());
     } catch (err) {
       console.log("error generating content", err);
     }
@@ -47,11 +57,9 @@ export default function Home() {
     setInputValue(e.target.value);
   };
   return (
-    //  <ChatForm/>
     <div className="flex min-h-screen w-full">
       <div className="w-1/2 bg-blue-100 flex flex-col">
         <div className="h-[70%] bg-blue-200 flex items-center justify-center">
-
         </div>
         <div className="h-[30%] bg-blue-300 flex items-end justify-center">
           <div className="w-5/6 bg-green-300 h-3/6 rounded-t-lg flex flex-col shadow-2xl">
@@ -84,7 +92,7 @@ export default function Home() {
         </div>
       </div>
       <div className="w-1/2 bg-green-200 flex items-center justify-center">
-         <p>{lllmResponse}</p>
+        <div dangerouslySetInnerHTML={{ __html: htmlToRender }}></div>
       </div>
     </div>
   );
