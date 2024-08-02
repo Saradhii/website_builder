@@ -1,15 +1,40 @@
 'use client';
 
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import axios from 'axios';
 import React, { useState, FormEvent, ChangeEvent } from 'react';
 
 const CustomForm: React.FC = () => {
   const [inputValue, setInputValue] = useState<string>('');
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+
+  const [lllmResponse, setLLLMResponse] = useState<string>('');
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  const genAI = new GoogleGenerativeAI(`${apiKey}`);
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-pro",
+  });
+
+  const generationConfig = {
+    temperature: 1,
+    topP: 0.95,
+    topK: 64,
+    maxOutputTokens: 8192,
+    responseMimeType: "text/plain",
+  };
+
+  const handleSubmit = async(e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log('Form submitted with input:', inputValue);
     try{
-      const response = axios.post('/generateContent', { content: inputValue });
-      console.log(response);
+      const chatSession = model.startChat({
+        generationConfig,
+        history: [
+        ],
+      });
+      const result = await chatSession.sendMessage(inputValue);
+      console.log(result.response.text());
     }catch(err){
       console.log("error generating content",err);
     }
