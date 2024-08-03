@@ -7,6 +7,9 @@ import { Content, GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
 import React, { useState, FormEvent, ChangeEvent } from 'react';
 import { marked } from "marked";
+import dotenv from "dotenv";
+import MyLottieAnimation from "@/components/MyLottieAnimation";
+dotenv.config();
 
 export default function Home() {
   const [inputValue, setInputValue] = useState<string>('');
@@ -32,7 +35,8 @@ export default function Home() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Form submitted with input:', inputValue);
+    console.log("process.env.GEMINI_API_KEY",process.env.GEMINI_API_KEY);
+    console.log('Form submitted with input:',inputValue);
     try {
       const chatSession = model.startChat({
         generationConfig,
@@ -44,9 +48,11 @@ export default function Home() {
       const htmlRegex = /```html([^`]*)```/g;
       let match;
       while ((match = htmlRegex.exec(lllmResponse)) !== null) {
+        console.log(match[1]);
         setHtmlToRender(match[1]);
       }
       const plainTextRegex = /```[^`]*```/g;
+      console.log(lllmResponse.replace(plainTextRegex, ''));
       setTextContent(lllmResponse.replace(plainTextRegex, '').trim());
     } catch (err) {
       console.log("error generating content", err);
@@ -92,6 +98,7 @@ export default function Home() {
         </div>
       </div>
       <div className="w-1/2 bg-green-200 flex items-center justify-center">
+      <MyLottieAnimation/>
         <div dangerouslySetInnerHTML={{ __html: htmlToRender }}></div>
       </div>
     </div>
