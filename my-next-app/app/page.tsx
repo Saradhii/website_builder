@@ -17,7 +17,7 @@ export default function Home() {
   const [htmlToRender, setHtmlToRender] = useState<string>('');
   const [textContent, setTextContent] = useState<string>('');
   const [history,setHistory] = useState<any[]>([]);
-
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const apiKey = process.env.GEMINI_API_KEY;
   const genAI = new GoogleGenerativeAI(`${apiKey}`);
 
@@ -35,6 +35,7 @@ export default function Home() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsLoading(true);
     console.log("process.env.GEMINI_API_KEY",process.env.GEMINI_API_KEY);
     console.log('Form submitted with input:',inputValue);
     try {
@@ -44,6 +45,7 @@ export default function Home() {
       });
       const result = await chatSession.sendMessage(inputValue);
       setLLLMResponse(result.response.text());
+      setIsLoading(false);
       // setHistory([...history, result.response]);
       const htmlRegex = /```html([^`]*)```/g;
       let match;
@@ -98,7 +100,7 @@ export default function Home() {
         </div>
       </div>
       <div className="w-1/2 bg-green-200 flex items-center justify-center">
-      <MyLottieAnimation/>
+      { isLoading && <MyLottieAnimation/>}
         <div dangerouslySetInnerHTML={{ __html: htmlToRender }}></div>
       </div>
     </div>
