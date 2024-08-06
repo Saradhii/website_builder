@@ -36,26 +36,32 @@ export default function Home() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    console.log("process.env.GEMINI_API_KEY",process.env.GEMINI_API_KEY);
-    console.log('Form submitted with input:',inputValue);
     try {
       const chatSession = model.startChat({
         generationConfig,
         history: history,
       });
-      const result = await chatSession.sendMessage(inputValue);
-      setLLLMResponse(result.response.text());
+      const Prompt = `
+      ${inputValue}, 
+      
+      Please response in json format with the following format:
+      {
+        htmlCode : "<html code here>",
+        plainText : "<plain text here>"
+      }`;
+      const result = await chatSession.sendMessage(Prompt);
+      const jsonResponse = JSON.parse(
+        result.response.text()
+          .replace("```json", "")
+          .replace("```", "")
+          .trim()
+      );
+      setLLLMResponse(jsonResponse);
       setIsLoading(false);
-      // setHistory([...history, result.response]);
-      const htmlRegex = /```html([^`]*)```/g;
-      let match;
-      while ((match = htmlRegex.exec(lllmResponse)) !== null) {
-        console.log(match[1]);
-        setHtmlToRender(match[1]);
-      }
-      const plainTextRegex = /```[^`]*```/g;
-      console.log(lllmResponse.replace(plainTextRegex, ''));
-      setTextContent(lllmResponse.replace(plainTextRegex, '').trim());
+      setHistory([...history, result.response]);
+      setHtmlToRender(jsonResponse.htmlCode);
+      setTextContent(jsonResponse.plainText);
+      console.log("htmlCode",jsonResponse.htmlCode);
     } catch (err) {
       console.log("error generating content", err);
     }
@@ -68,6 +74,7 @@ export default function Home() {
     <div className="flex min-h-screen w-full">
       <div className="w-1/2 bg-blue-100 flex flex-col">
         <div className="h-[70%] bg-blue-200 flex items-center justify-center">
+          {textContent}
         </div>
         <div className="h-[30%] bg-blue-300 flex items-end justify-center">
           <div className="w-5/6 bg-green-300 h-3/6 rounded-t-lg flex flex-col shadow-2xl">
