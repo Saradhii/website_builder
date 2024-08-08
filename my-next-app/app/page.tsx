@@ -2,7 +2,6 @@
 import Image from "next/image";
 import ChatForm from "@/components/chatForm";
 import UserInput from "@/components/userInput";
-import CustomForm from "@/components/customForm";
 import { Content, GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
 import React, { useState, FormEvent, ChangeEvent } from 'react';
@@ -90,7 +89,7 @@ export default function Home() {
                     caretColor: 'black',
                   }}
                 />
-                <button
+                { isLoading ? <div className="h-10 w-10"><MyLottieAnimation/></div> : <button
                   type="submit"
                   className="ml-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                   aria-label="Submit"
@@ -98,7 +97,7 @@ export default function Home() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                   </svg>
-                </button>
+                </button>}
               </form>
             </div>
             <div>
@@ -107,7 +106,6 @@ export default function Home() {
         </div>
       </div>
       <div className="w-1/2 bg-green-200 flex items-center justify-center">
-      { isLoading && <MyLottieAnimation/>}
         <div dangerouslySetInnerHTML={{ __html: htmlToRender }}></div>
       </div>
     </div>
