@@ -53,6 +53,7 @@ import axios from 'axios';
 import React, { useState, FormEvent, ChangeEvent } from 'react';
 import dotenv from "dotenv";
 import { RetroGridDemo } from "@/components/retro-grid-demo";
+import MyLottieAnimation from "@/components/MyLottieAnimation";
 // import MyLottieAnimation from "@/components/MyLottieAnimation";
 dotenv.config();
 
@@ -62,7 +63,7 @@ export default function Home() {
   const [htmlToRender, setHtmlToRender] = useState<string>('');
   const [textContent, setTextContent] = useState<string>('');
   const [history,setHistory] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const apiKey = process.env.GEMINI_API_KEY;
   const genAI = new GoogleGenerativeAI(`${apiKey}`);
 
@@ -135,7 +136,7 @@ export default function Home() {
                     caretColor: 'black',
                   }}
                 />
-                { isLoading ? <div className="h-10 w-10"></div> : <button
+                { isLoading ? <div className="h-10 w-10"><MyLottieAnimation/></div> : <button
                   type="submit"
                   className="ml-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                   aria-label="Submit"
