@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{\"components/MyLottieAnimation.tsx -> lottie-web\":{\"id\":\"components/MyLottieAnimation.tsx -> lottie-web\",\"files\":[\"static/chunks/_app-pages-browser_node_modules_pnpm_lottie-web_5_12_2_node_modules_lottie-web_build_player_l-5bb38f.js\"]}}"
+self.__REACT_LOADABLE_MANIFEST='{"components/MyLottieAnimation.tsx -> lottie-web":{"id":3612,"files":["static/chunks/39811124.844a8e48fc774f5b.js"]}}';
