@@ -153,8 +153,8 @@ export default function Home() {
         </div>
       </div>
       <div className="w-1/2 bg-green-200 flex items-center justify-center">
-      {/* <RetroGridDemo /> */}
-      <MyLottieAnimation/>
+      <RetroGridDemo />
+      {/* <MyLottieAnimation/> */}
         <div dangerouslySetInnerHTML={{ __html: htmlToRender }}></div>
       </div>
     </div>

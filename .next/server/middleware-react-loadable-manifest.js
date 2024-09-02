@@ -1,1 +1,0 @@
-self.__REACT_LOADABLE_MANIFEST='{"components/MyLottieAnimation.tsx -> lottie-web":{"id":3612,"files":["static/chunks/39811124.844a8e48fc774f5b.js"]}}';
