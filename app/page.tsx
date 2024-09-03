@@ -10,6 +10,7 @@ import { NeonGradientCard } from "@/components/magicui/neon-gradient-card";
 import Ripple from "@/components/magicui/ripple";
 import ShineBorder from "@/components/magicui/shine-border";
 import { useTheme } from "next-themes";
+import Safari from "@/components/magicui/safari";
 // import MyLottieAnimation from "@/components/MyLottieAnimation";
 dotenv.config();
 
@@ -76,20 +77,15 @@ export default function Home() {
   };
   return (
     <div className="flex h-screen w-screen">
-      <div className="w-1/2 bg-blue-100 flex flex-col">
+      <div className="w-full bg-blue-100 flex flex-col">
         <div className="h-[70%] bg-blue-200 flex items-center justify-center shadow-2xl">
-          {/* <div className="w-5/6 h-3/6"><NeonGradientCard className="w-5/6 h-3/6"/></div> */}
-          {/* <Ripple/> */}
-          {/* <ShineBorder></ShineBorder> */}
           <span className="pointer-events-none z-10 whitespace-pre-wrap bg-gradient-to-b from-[#ffd319] via-[#ff2975] to-[#8c1eff] bg-clip-text text-center text-7xl font-bold leading-none tracking-tighter text-transparent">
-          Your AI powered website builder
+          Your AI powered <br></br>
+          website builder
           </span>
-          {/* {isLoading == null ? <span className="pointer-events-none z-10 whitespace-pre-wrap bg-gradient-to-b from-[#ffd319] via-[#ff2975] to-[#8c1eff] bg-clip-text text-center text-7xl font-bold leading-none tracking-tighter text-transparent">
-          Your AI powered website builder
-          </span> : <p></p> } */}
         </div>
         <div className="h-[30%] bg-blue-300 flex items-end justify-center">
-          <div className="w-5/6 bg-green-300 h-3/6 rounded-t-xl flex flex-col shadow-2xl">
+          <div className="w-[590px] bg-green-300 h-3/6 rounded-t-xl flex flex-col shadow-2xl">
             <div className="p-4">
               <form className="flex items-center" onSubmit={handleSubmit}>
                 <textarea
@@ -141,10 +137,9 @@ export default function Home() {
           </NeonGradientCard> */}
         </div>
       </div>
-      <div className="w-1/2 bg-green-200 flex items-center justify-center">
-      
+      {isLoading ? <div className="w-[90%] bg-green-200 flex items-center justify-center">
       {isLoading ? <RetroGridDemo /> : <div dangerouslySetInnerHTML={{ __html: htmlToRender }}></div>}
-      </div>
+      </div> :null }
     </div>
   );
 }
