@@ -1,51 +1,3 @@
-// import { Command } from "lucide-react";
-// import Link from "next/link";
-// import { DarkModeToggle } from "@/components/dark-mode-toggle";
-// import { RetroGridDemo } from "@/components/retro-grid-demo";
-// import { AnimatedListDemo } from "@/components/animated-list-demo";
-// import { DockDemo } from "@/components/dock-demo";
-
-// export default function Index() {
-//   return (
-//     <section className="w-full min-h-screen flex flex-col">
-//       <nav className="flex items-center justify-between p-4 w-full">
-//         <Link href="/" className="flex items-center space-x-2">
-//           <Command className="h-8 w-8" />
-//           <h1 className="text-xl font-semibold">Next + Magic-ui</h1>
-//         </Link>
-//         <DarkModeToggle />
-//       </nav>
-//       <div className="container flex justify-center px-4 md:px-6 flex-1 py-8 overflow-x-hidden">
-//         <div className="flex flex-col items-center space-y-4 text-center p-4 md:w-1/2">
-//           <h1 className="text-3xl md:text-4xl font-bold tracking-tighter">
-//             A{" "}
-//             <span className="font-extrabold bg-gradient-to-r from-orange-700 via-blue-500 to-green-400 text-transparent bg-clip-text bg-300% animate-gradient">
-//               Simple Starter
-//             </span>{" "}
-//             For Nextjs, Shadcn-ui and{" "}
-//             <Link
-//               href="https://magicui.design/"
-//               className="hover:text-blue-500"
-//             >
-//               Magic-ui
-//             </Link>
-//           </h1>
-
-//           <div className="px-4 w-full">
-//             <RetroGridDemo />
-//           </div>
-//           <div className="px-4 w-full">
-//             <AnimatedListDemo />
-//           </div>
-//           <div className="px-4 w-full">
-//             <DockDemo />
-//           </div>
-//         </div>
-//       </div>
-//     </section>
-//   );
-// }
-
 'use client';
 import Image from "next/image";
 import { Content, GoogleGenerativeAI } from '@google/generative-ai';
@@ -68,8 +20,8 @@ export default function Home() {
   const [htmlToRender, setHtmlToRender] = useState<string>('');
   const [textContent, setTextContent] = useState<string>('');
   const [history,setHistory] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const apiKey = process.env.GEMINI_API_KEY;
+  const [isLoading, setIsLoading] = useState<boolean | null>(null);
+  const apiKey = process.env.GEMINI_API_KEY || "AIzaSyBoWVLiSCXKk69y6LbmN1UvY0suBI1l2Tg";
   const genAI = new GoogleGenerativeAI(`${apiKey}`);
 
   const model = genAI.getGenerativeModel({
@@ -88,6 +40,7 @@ export default function Home() {
     e.preventDefault();
     setIsLoading(true);
     try {
+      console.log("inputValue",inputValue);
       const chatSession = model.startChat({
         generationConfig,
         history: history,
@@ -122,19 +75,21 @@ export default function Home() {
     setInputValue(e.target.value);
   };
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="flex h-screen w-screen">
       <div className="w-1/2 bg-blue-100 flex flex-col">
         <div className="h-[70%] bg-blue-200 flex items-center justify-center shadow-2xl">
-          {textContent}
           {/* <div className="w-5/6 h-3/6"><NeonGradientCard className="w-5/6 h-3/6"/></div> */}
           {/* <Ripple/> */}
           {/* <ShineBorder></ShineBorder> */}
           <span className="pointer-events-none z-10 whitespace-pre-wrap bg-gradient-to-b from-[#ffd319] via-[#ff2975] to-[#8c1eff] bg-clip-text text-center text-7xl font-bold leading-none tracking-tighter text-transparent">
           Your AI powered website builder
           </span>
+          {/* {isLoading == null ? <span className="pointer-events-none z-10 whitespace-pre-wrap bg-gradient-to-b from-[#ffd319] via-[#ff2975] to-[#8c1eff] bg-clip-text text-center text-7xl font-bold leading-none tracking-tighter text-transparent">
+          Your AI powered website builder
+          </span> : <p></p> } */}
         </div>
         <div className="h-[30%] bg-blue-300 flex items-end justify-center">
-          <div className="w-5/6 bg-green-300 h-3/6 rounded-t-lg flex flex-col shadow-2xl">
+          <div className="w-5/6 bg-green-300 h-3/6 rounded-t-xl flex flex-col shadow-2xl">
             <div className="p-4">
               <form className="flex items-center" onSubmit={handleSubmit}>
                 <textarea
@@ -187,10 +142,8 @@ export default function Home() {
         </div>
       </div>
       <div className="w-1/2 bg-green-200 flex items-center justify-center">
-      {/* <RetroGridDemo /> */}
-      {/* <NeonGradientCard/> */}
-      {/* <MyLottieAnimation/> */}
-        {/* <div dangerouslySetInnerHTML={{ __html: htmlToRender }}></div> */}
+      
+      {isLoading ? <RetroGridDemo /> : <div dangerouslySetInnerHTML={{ __html: htmlToRender }}></div>}
       </div>
     </div>
   );
