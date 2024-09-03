@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 
 export default function RetroGrid({ className }: { className?: string }) {
-  console.log("className", className);
   return (
     <div
       className={cn(
