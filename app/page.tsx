@@ -16,6 +16,7 @@ dotenv.config();
 
 export default function Home() {
   const theme = useTheme();
+  const [requesting, setRequesting] = useState("not requesting");
   const [inputValue, setInputValue] = useState<string>('');
   const [lllmResponse, setLLLMResponse] = useState<string>('');
   const [htmlToRender, setHtmlToRender] = useState<string>('');
@@ -44,6 +45,7 @@ export default function Home() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
+    setRequesting("requesting");
     try {
       const chatSession = model.startChat({
         generationConfig,
@@ -69,8 +71,7 @@ export default function Home() {
       setHistory([...history, result.response]);
       setHtmlToRender(jsonResponse.htmlCode);
       setTextContent(jsonResponse.plainText);
-      console.log(jsonResponse.plainText);
-      console.log("htmlCode", jsonResponse.htmlCode);
+      setRequesting("completed");
     } catch (err) {
       console.log("error generating content", err);
     }
@@ -83,23 +84,24 @@ export default function Home() {
     <div className="flex h-screen w-screen">
       <div className="w-full bg-blue-100 flex flex-col">
         <div className="h-[70%] bg-blue-200 flex flex-col shadow-2xl">
-          <div className="h-[10%] w-full flex justify-end p-2">
-            <label className="inline-flex items-center cursor-pointer">
+          <div className="h-[5%] w-full flex justify-end p-2">
+              {requesting == "completed" ? <label className="inline-flex items-center cursor-pointer">
               <input type="checkbox" value="" className="sr-only peer" onChange={handleCheckboxChange} />
               <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300 mr-2">Dev Mode</span>
               <div className="relative w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#ff2975]">
               </div>
-            </label>
+            </label>  : null}
           </div>
-          <div className="h-[90%] w-full flex items-center justify-center ">
-            {isLoading == null ? <span className="pointer-events-none z-10 whitespace-pre-wrap bg-gradient-to-b from-[#ffd319] via-[#ff2975] to-[#8c1eff] bg-clip-text text-center text-7xl font-bold leading-none tracking-tighter text-transparent">
+          <div className="h-[95%] w-full flex items-center justify-center">
+            {
+            isLoading == null ? 
+            <span className="pointer-events-none z-10 whitespace-pre-wrap bg-gradient-to-b from-[#ffd319] via-[#ff2975] to-[#8c1eff] bg-clip-text text-center text-7xl font-bold leading-none tracking-tighter text-transparent">
               Your AI powered <br></br>
               website builder
-            </span> : isChecked ? <div className="p-4 mt-32">
-              <pre className="bg-gray-800 text-white rounded p-2 text-sm w-[690px] h-[600px] overflow-auto">
-                <code className="text-[10px]">{htmlToRender}</code>
-              </pre>
-            </div> : <div className="text-center text-sm font-mono text-gray-800 p-4">
+            </span> : 
+            isChecked ? <div className="w-[100%] h-[100%] text-sm bg-gray-800 text-white overflow-auto whitespace-pre-line p-5">
+                <code className="font-mono">{htmlToRender}</code>
+              </div> : <div className="text-center text-sm font-mono text-gray-800 p-4">
               {textContent}
             </div>
             }
