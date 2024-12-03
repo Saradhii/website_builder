@@ -44,25 +44,28 @@ export default function Home() {
     maxOutputTokens: 8192,
     responseMimeType: "text/plain",
   };
+  
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    console.log("submitting form");
+    console.log("history",history);
     e.preventDefault();
     setIsLoading(true);
     setRequesting("requesting");
     try {
       const chatSession = model.startChat({
         generationConfig,
-        history: history,
       });
       const Prompt = `
       ${inputValue}, 
-      
+      ${htmlToRender ? htmlToRender : ""},
       Please respond in below json format:
       {
         htmlCode : "html code here, please use inline css",
         plainText : "Plain text about the html code content here"
       }`;
       const result = await chatSession.sendMessage(Prompt);
+      console.log("result", result);
       const jsonResponse = JSON.parse(
         result.response.text()
           .replace("```json", "")
