@@ -88,7 +88,7 @@ export default function Home() {
     <div className="relative h-screen w-screen overflow-hidden">
       {/* Animated Grid Pattern Background */}
       <AnimatedGridPattern
-        className="absolute inset-0 z-0 text-purple-400"
+        className="absolute inset-0 z-0 text-purple-400 bg-white"
         width={30}
         height={30}
         numSquares={200}
@@ -111,12 +111,10 @@ export default function Home() {
             <div className="h-[95%] w-full flex items-center justify-center">
               {
                 isLoading == null ?
-                 <div className="flex items-center justify-center bg-white/20 backdrop-blur-sm">
-                   <span className="pointer-events-none z-10 whitespace-pre-wrap bg-gradient-to-b from-[#ffd319] via-[#ff2975] to-[#8c1eff] bg-clip-text text-center text-7xl font-bold leading-none tracking-tighter text-transparent">
+                  <span className="pointer-events-none z-10 whitespace-pre-wrap bg-gradient-to-b from-[#ffd319] via-[#ff2975] to-[#8c1eff] bg-clip-text text-center text-7xl font-bold leading-none tracking-tighter text-transparent">
                     Your AI powered <br></br>
                     website builder
-                  </span>
-                 </div> :
+                  </span> :
                   isChecked ?
                     // <div className="w-[100%] h-[100%] text-sm bg-gray-800 text-white overflow-auto whitespace-pre-line p-5">
                     //     <code className="font-mono">{htmlToRender}</code>
