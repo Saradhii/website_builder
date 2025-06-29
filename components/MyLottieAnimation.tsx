@@ -16,7 +16,7 @@ const MyLottieAnimation = () => {
         renderer: 'svg',
         loop: true,
         autoplay: true,
-        path: '/loader.json', 
+        path: '/fireAnimation.json', 
       });
       return () => animation.destroy();
     }

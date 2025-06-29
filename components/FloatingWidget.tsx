@@ -57,14 +57,14 @@ const HelpDeskWidget: React.FC = () => {
       setMessages(updatedMessages);
       setInputMessage('');
       setIsTyping(true);
-  
+
       try {
         const response = await fetch('http://localhost:8000/api/sample', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: inputMessage, history: updatedMessages }),
         });
-  
+
         const data: any = await response.json();
         if (data.success && data.response) {
           const botMessage: Message = { text: data.response.text, sender: 'bot' };
@@ -79,7 +79,7 @@ const HelpDeskWidget: React.FC = () => {
       }
     }
   };
-  
+
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -106,11 +106,10 @@ const HelpDeskWidget: React.FC = () => {
                 className={`mb-4 flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`p-3 rounded-lg max-w-[80%] ${
-                    msg.sender === 'user'
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100'
-                  }`}
+                  className={`p-3 rounded-lg max-w-[80%] ${msg.sender === 'user'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100'
+                    }`}
                 >
                   {msg.text}
                 </div>
@@ -126,7 +125,7 @@ const HelpDeskWidget: React.FC = () => {
             <form onSubmit={sendMessage} className="flex w-full gap-2">
               <Input
                 value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputMessage(e.target.value)}
                 placeholder="Type your message..."
                 className="flex-1"
               />
