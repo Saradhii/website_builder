@@ -14,6 +14,7 @@ import Safari from "@/components/magicui/safari";
 import CodeMirror from '@uiw/react-codemirror';
 import { html } from '@codemirror/lang-html';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { AnimatedGridPattern } from "@/components/magicui/animated-grid-pattern";
 // import MyLottieAnimation from "@/components/MyLottieAnimation";
 dotenv.config();
 
