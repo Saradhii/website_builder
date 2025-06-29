@@ -1,15 +1,15 @@
 import { cn } from "@/lib/utils";
 
 export default function RetroGrid({ className }: { className?: string }) {
+  console.log("className", className);
   return (
     <div
       className={cn(
-        "pointer-events-none absolute h-full w-full overflow-hidden opacity-50 [perspective:200px]",
-        className
+        "pointer-events-none absolute h-full w-full overflow-hidden [perspective:200px] bg-white"
       )}
     >
       {/* Grid */}
-      <div className="absolute inset-0 [transform:rotateX(35deg)]">
+      <div className="absolute inset-0 [transform:rotateX(35deg)] opacity-50">
         <div
           className={cn(
             "animate-grid",
