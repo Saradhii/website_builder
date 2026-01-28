@@ -9,6 +9,7 @@ interface Item {
   icon: string;
   color: string;
   time: string;
+  id?: string;
 }
 
 let notifications = [
@@ -43,7 +44,10 @@ let notifications = [
   },
 ];
 
-notifications = Array.from({ length: 10 }, () => notifications).flat();
+// Create unique notifications instead of duplicating
+const allNotifications = Array.from({ length: 10 }, (_, i) => 
+  notifications.map(n => ({ ...n, id: `${n.name}-${i}` }))
+).flat();
 
 const Notification = ({ name, description, icon, color, time }: Item) => {
   return (
@@ -86,8 +90,8 @@ export function AnimatedListDemo() {
   return (
     <div className="relative flex max-h-[400px] min-h-[400px] w-full flex-col overflow-hidden rounded-lg border bg-background p-6 shadow-lg">
       <AnimatedList>
-        {notifications.map((item, idx) => (
-          <Notification {...item} key={idx} />
+        {allNotifications.map((item) => (
+          <Notification {...item} key={item.id} />
         ))}
       </AnimatedList>
     </div>

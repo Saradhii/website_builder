@@ -59,13 +59,20 @@ const HelpDeskWidget: React.FC = () => {
       setIsTyping(true);
 
       try {
-        const response = await fetch('http://localhost:8000/api/sample', {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+        const response = await fetch(`${apiUrl}/sample`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: inputMessage, history: updatedMessages }),
         });
 
-        const data: any = await response.json();
+        interface ApiResponse {
+          success: boolean;
+          response?: { text: string };
+          error?: string;
+        }
+        
+        const data: ApiResponse = await response.json();
         if (data.success && data.response) {
           const botMessage: Message = { text: data.response.text, sender: 'bot' };
           setMessages((prev) => [...prev, botMessage]);

@@ -1,34 +1,55 @@
 'use client';
-import Image from "next/image";
 import { Content, GoogleGenerativeAI } from '@google/generative-ai';
-import axios from 'axios';
 import React, { useState, FormEvent, ChangeEvent } from 'react';
-import dotenv from "dotenv";
 import { RetroGridDemo } from "@/components/retro-grid-demo";
 import MyLottieAnimation from "@/components/MyLottieAnimation";
-import { NeonGradientCard } from "@/components/magicui/neon-gradient-card";
-import Ripple from "@/components/magicui/ripple";
-import ShineBorder from "@/components/magicui/shine-border";
 import { useTheme } from "next-themes";
-import Safari from "@/components/magicui/safari";
 import CodeMirror from '@uiw/react-codemirror';
 import { html } from '@codemirror/lang-html';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { AnimatedGridPattern } from "@/components/magicui/animated-grid-pattern";
-// import MyLottieAnimation from "@/components/MyLottieAnimation";
-dotenv.config();
+
+interface HistoryItem {
+  role: 'user' | 'model';
+  parts: { text: string }[];
+}
+
+interface AIResponse {
+  htmlCode: string;
+  plainText: string;
+}
+
+const parseAIResponse = (text: string): AIResponse | null => {
+  try {
+    const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (parsed.htmlCode && parsed.plainText) {
+      return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse AI response');
+  }
+  return null;
+};
+
+const sanitizeHtml = (html: string): string => {
+  // Basic XSS protection - remove script tags and event handlers
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+\s*=/gi, '');
+};
 
 export default function Home() {
   const theme = useTheme();
   const [requesting, setRequesting] = useState("not requesting");
   const [inputValue, setInputValue] = useState<string>('');
-  const [lllmResponse, setLLLMResponse] = useState<string>('');
-  const [htmlToRender, setHtmlToRender] = useState<string>(``);
+  const [lllmResponse, setLLLMResponse] = useState<AIResponse | null>(null);
+  const [htmlToRender, setHtmlToRender] = useState<string>('');
   const [textContent, setTextContent] = useState<string>('');
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean | null>(null);
   const [isChecked, setIsChecked] = useState(false);
-  const handleCheckboxChange = (event: any) => {
+  const handleCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setIsChecked(event.target.checked);
   };
   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
@@ -64,16 +85,16 @@ export default function Home() {
         plainText : "Plain text about the html code content here"
       }`;
       const result = await chatSession.sendMessage(Prompt);
-      const jsonResponse = JSON.parse(
-        result.response.text()
-          .replace("```json", "")
-          .replace("```", "")
-          .trim()
-      );
+      const jsonResponse = parseAIResponse(result.response.text());
+      
+      if (!jsonResponse) {
+        throw new Error('Invalid AI response format');
+      }
+      
       setLLLMResponse(jsonResponse);
       setIsLoading(false);
-      setHistory([...history, result.response]);
-      setHtmlToRender(jsonResponse.htmlCode);
+      setHistory([...history, { role: 'model', parts: [{ text: result.response.text() }] }]);
+      setHtmlToRender(sanitizeHtml(jsonResponse.htmlCode));
       setTextContent(jsonResponse.plainText);
       setRequesting("completed");
     } catch (err) {
@@ -176,7 +197,7 @@ export default function Home() {
           </div>
         </div>
         {isLoading !== null ? <div className="w-1/2 bg-green-200/80 backdrop-blur-sm flex items-center justify-center">
-          {isLoading ? <RetroGridDemo /> : <div dangerouslySetInnerHTML={{ __html: htmlToRender }}></div>}
+          {isLoading ? <RetroGridDemo /> : <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlToRender) }}></div>}
         </div> : null}
       </div>
     </div>
