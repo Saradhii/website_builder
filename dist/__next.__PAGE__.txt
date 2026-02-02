@@ -1,0 +1,7 @@
+1:"$Sreact.fragment"
+2:I[25561,["/_next/static/chunks/99ae8d0ee9d87c01.js","/_next/static/chunks/8933f21c2af1a1fa.js","/_next/static/chunks/14dea18c6b03cef1.js","/_next/static/chunks/ac3ddb0471eb0ceb.js"],"WavyBackground"]
+3:I[41979,["/_next/static/chunks/99ae8d0ee9d87c01.js","/_next/static/chunks/8933f21c2af1a1fa.js","/_next/static/chunks/14dea18c6b03cef1.js","/_next/static/chunks/ac3ddb0471eb0ceb.js"],"ChatInterface"]
+4:I[87562,["/_next/static/chunks/99ae8d0ee9d87c01.js","/_next/static/chunks/7a69b11261599dbd.js"],"OutletBoundary"]
+5:"$Sreact.suspense"
+0:{"buildId":"p_4NH8BMX8nybBBQqHnTS","rsc":["$","$1","c",{"children":[["$","$L2",null,{"className":"h-full w-full","containerClassName":"h-full w-full","backgroundFill":"hsl(var(--background))","colors":["hsl(var(--primary))","hsl(var(--secondary))","hsl(var(--accent))","hsl(var(--muted))","hsl(var(--card))"],"waveOpacity":0.3,"blur":15,"speed":"slow","children":["$","div",null,{"className":"h-full w-full flex items-center justify-center p-4","children":["$","$L3",null,{}]}]}],[["$","script","script-0",{"src":"/_next/static/chunks/ac3ddb0471eb0ceb.js","async":true}]],["$","$L4",null,{"children":["$","$5",null,{"name":"Next.MetadataOutlet","children":"$@6"}]}]]}],"loading":null,"isPartial":false}
+6:null
