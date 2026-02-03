@@ -1,28 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Logo } from "./logo";
-import { NavMenu } from "./nav-menu";
-import { NavigationSheet } from "./navigation-sheet";
 
 export const Navbar = () => {
   return (
-    <nav className="h-16 border-b bg-background">
-      <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <nav className="h-16 border-b bg-background relative z-50">
+      <div className="mx-auto flex h-full max-w-3xl items-center justify-between px-4 sm:px-6">
         <Logo />
 
-        {/* Desktop Menu */}
-        <NavMenu className="hidden md:block" />
-
-        <div className="flex items-center gap-3">
-          <Button className="hidden sm:inline-flex" variant="outline">
-            Sign In
-          </Button>
-          <Button className="hidden sm:inline-flex">Get Started</Button>
-
-          {/* Mobile Menu */}
-          <div className="md:hidden">
-            <NavigationSheet />
-          </div>
-        </div>
+        <Button variant="outline">
+          Sign In
+        </Button>
       </div>
     </nav>
   );

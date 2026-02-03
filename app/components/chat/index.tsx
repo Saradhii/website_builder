@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { ArrowUp, ChevronDown, Paperclip } from "lucide-react";
+import { ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
 import {
   BookOpenText,
   Brain,
@@ -19,7 +19,6 @@ import {
   PaintBrush,
   Sparkle,
 } from "@phosphor-icons/react";
-
 // Model type definition
 interface Model {
   id: string;
@@ -27,10 +26,29 @@ interface Model {
   provider: string;
 }
 
-// Dummy models data
-const DUMMY_MODELS: Model[] = [
-  { id: "gpt-4", name: "GPT-4.1 Nano", provider: "openai" },
-  { id: "claude", name: "Claude 3.5 Sonnet", provider: "anthropic" },
+interface UploadedImage {
+  id: string;
+  file: File;
+  preview: string;
+}
+
+// OpenRouter models with inline SVG icons
+const MODELS: Model[] = [
+  {
+    id: "openai/gpt-oss-120b:free",
+    name: "GPT-OSS 120B",
+    provider: "openai",
+  },
+  {
+    id: "z-ai/glm-4.5-air:free",
+    name: "GLM 4.5 Air",
+    provider: "zai",
+  },
+  {
+    id: "google/gemma-3-27b-it:free",
+    name: "Gemma 3 27B",
+    provider: "gemma",
+  },
 ];
 
 // Suggestions data with icons from Zola
@@ -44,34 +62,62 @@ const SUGGESTIONS = [
   { id: "gently", label: "Learn Gently", icon: Lightbulb },
 ];
 
-// Model Icon Component using LobeHub
-function ModelIcon({ provider, className }: { provider: string; className?: string }) {
-  const icons: Record<string, React.ReactNode> = {
-    openai: (
-      <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-        <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.896zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z" />
-      </svg>
-    ),
-    anthropic: (
-      <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-        <path d="M17.304 3.541h-3.672l6.696 16.918h3.672zm-10.608 0L0 20.459h3.744l1.368-3.6h6.624l1.368 3.6h3.744L10.224 3.541zm-.264 10.656l1.944-5.184 1.944 5.184z" />
-      </svg>
-    ),
-    google: (
-      <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 2.4c5.28 0 9.6 4.32 9.6 9.6s-4.32 9.6-9.6 9.6S2.4 17.28 2.4 12 6.72 2.4 12 2.4z" />
-      </svg>
-    ),
-  };
+// Accepted image MIME types
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "image/bmp",
+  "image/tiff",
+];
 
-  return icons[provider] || null;
+// Max file size in bytes (10MB)
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+// Model Icon Component using inline SVGs from Lobehub
+function ModelIcon({ provider, className }: { provider: string; className?: string }) {
+  switch (provider) {
+    case "openai":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path fillRule="evenodd" clipRule="evenodd" d="M21.55 10.004a5.416 5.416 0 00-.478-4.501c-1.217-2.09-3.662-3.166-6.05-2.66A5.59 5.59 0 0010.831 1C8.39.995 6.224 2.546 5.473 4.838A5.553 5.553 0 001.76 7.496a5.487 5.487 0 00.691 6.5 5.416 5.416 0 00.477 4.502c1.217 2.09 3.662 3.165 6.05 2.66A5.586 5.586 0 0013.168 23c2.443.006 4.61-1.546 5.361-3.84a5.553 5.553 0 003.715-2.66 5.488 5.488 0 00-.693-6.497v.001zm-8.381 11.558a4.199 4.199 0 01-2.675-.954c.034-.018.093-.05.132-.074l4.44-2.53a.71.71 0 00.364-.623v-6.176l1.877 1.069c.02.01.033.029.036.05v5.115c-.003 2.274-1.87 4.118-4.174 4.123zM4.192 17.78a4.059 4.059 0 01-.498-2.763c.032.02.09.055.131.078l4.44 2.53c.225.13.504.13.73 0l5.42-3.088v2.138a.068.068 0 01-.027.057L9.9 19.288c-1.999 1.136-4.552.46-5.707-1.51h-.001zM3.023 8.216A4.15 4.15 0 015.198 6.41l-.002.151v5.06a.711.711 0 00.364.624l5.42 3.087-1.876 1.07a.067.067 0 01-.063.005l-4.489-2.559c-1.995-1.14-2.679-3.658-1.53-5.63h.001zm15.417 3.54l-5.42-3.088L14.896 7.6a.067.067 0 01.063-.006l4.489 2.557c1.998 1.14 2.683 3.662 1.529 5.633a4.163 4.163 0 01-2.174 1.807V12.38a.71.71 0 00-.363-.623zm1.867-2.773a6.04 6.04 0 00-.132-.078l-4.44-2.53a.731.731 0 00-.729 0l-5.42 3.088V7.325a.068.068 0 01.027-.057L14.1 4.713c2-1.137 4.555-.46 5.707 1.513.487.833.664 1.809.499 2.757h.001zm-11.741 3.81l-1.877-1.068a.065.065 0 01-.036-.051V6.559c.001-2.277 1.873-4.122 4.181-4.12.976 0 1.92.338 2.671.954-.034.018-.092.05-.131.073l-4.44 2.53a.71.71 0 00-.365.623l-.003 6.173v.002zm1.02-2.168L12 9.25l2.414 1.375v2.75L12 14.75l-2.415-1.375v-2.75z" />
+        </svg>
+      );
+    case "zai":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path fillRule="evenodd" clipRule="evenodd" d="M12.105 2L9.927 4.953H.653L2.83 2h9.276zM23.254 19.048L21.078 22h-9.242l2.174-2.952h9.244zM24 2L9.264 22H0L14.736 2H24z" />
+        </svg>
+      );
+    case "gemma":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="gemma-gradient" x1="24.419%" x2="75.194%" y1="75.581%" y2="25.194%">
+              <stop offset="0%" stopColor="#446EFF" />
+              <stop offset="36.661%" stopColor="#2E96FF" />
+              <stop offset="83.221%" stopColor="#B1C5FF" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#gemma-gradient)" fillRule="evenodd" clipRule="evenodd" d="M12.34 5.953a8.233 8.233 0 01-.247-1.125V3.72a8.25 8.25 0 015.562 2.232H12.34zm-.69 0c.113-.373.199-.755.257-1.145V3.72a8.25 8.25 0 00-5.562 2.232h5.304zm-5.433.187h5.373a7.98 7.98 0 01-.267.696 8.41 8.41 0 01-1.76 2.65L6.216 6.14zm-.264-.187H2.977v.187h2.915a8.436 8.436 0 00-2.357 5.767H0v.186h3.535a8.436 8.436 0 002.357 5.767H2.977v.186h2.976v2.977h.187v-2.915a8.436 8.436 0 005.767 2.357V24h.186v-3.535a8.436 8.436 0 005.767-2.357v2.915h.186v-2.977h2.977v-.186h-2.915a8.436 8.436 0 002.357-5.767H24v-.186h-3.535a8.436 8.436 0 00-2.357-5.767h2.915v-.187h-2.977V2.977h-.186v2.915a8.436 8.436 0 00-5.767-2.357V0h-.186v3.535A8.436 8.436 0 006.14 5.892V2.977h-.187v2.976zm6.14 14.326a8.25 8.25 0 005.562-2.233H12.34c-.108.367-.19.743-.247 1.126v1.107zm-.186-1.087a8.015 8.015 0 00-.258-1.146H6.345a8.25 8.25 0 005.562 2.233v-1.087zm-8.186-7.285h1.107a8.23 8.23 0 001.125-.247V6.345a8.25 8.25 0 00-2.232 5.562zm1.087.186H3.72a8.25 8.25 0 002.232 5.562v-5.304a8.012 8.012 0 00-1.145-.258zm15.47-.186a8.25 8.25 0 00-2.232-5.562v5.315c.367.108.743.19 1.126.247h1.107zm-1.086.186c-.39.058-.772.144-1.146.258v5.304a8.25 8.25 0 002.233-5.562h-1.087zm-1.332 5.69V12.41a7.97 7.97 0 00-.696.267 8.409 8.409 0 00-2.65 1.76l3.346 3.346zm0-6.18v-5.45l-.012-.013h-5.451c.076.235.162.468.26.696a8.698 8.698 0 001.819 2.688 8.698 8.698 0 002.688 1.82c.228.097.46.183.696.259zM6.14 17.848V12.41c.235.078.468.167.696.267a8.403 8.403 0 012.688 1.799 8.404 8.404 0 011.799 2.688c.1.228.19.46.267.696H6.152l-.012-.012zm0-6.245V6.326l3.29 3.29a8.716 8.716 0 01-2.594 1.728 8.14 8.14 0 01-.696.259zm6.257 6.257h5.277l-3.29-3.29a8.716 8.716 0 00-1.728 2.594 8.135 8.135 0 00-.259.696zm-2.347-7.81a9.435 9.435 0 01-2.88 1.96 9.14 9.14 0 012.88 1.94 9.14 9.14 0 011.94 2.88 9.435 9.435 0 011.96-2.88 9.14 9.14 0 012.88-1.94 9.435 9.435 0 01-2.88-1.96 9.434 9.434 0 01-1.96-2.88 9.14 9.14 0 01-1.94 2.88z" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 }
 
 export function ChatInterface() {
   const [inputValue, setInputValue] = useState("");
-  const [selectedModel, setSelectedModel] = useState("gpt-4");
+  const [selectedModel, setSelectedModel] = useState(MODELS[0].id);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -84,42 +130,176 @@ export function ChatInterface() {
     }
   }, [inputValue]);
 
-  const selectedModelData = DUMMY_MODELS.find((m) => m.id === selectedModel);
+  // Cleanup image previews on unmount
+  useEffect(() => {
+    return () => {
+      uploadedImages.forEach((img) => URL.revokeObjectURL(img.preview));
+    };
+  }, [uploadedImages]);
+
+  const selectedModelData = MODELS.find((m: Model) => m.id === selectedModel);
+
+  const validateFile = (file: File): boolean => {
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      alert(`File type not supported. Please upload an image file.`);
+      return false;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      alert(`File too large. Maximum size is 10MB.`);
+      return false;
+    }
+    return true;
+  };
+
+  const handleFileUpload = useCallback((files: FileList | null) => {
+    if (!files) return;
+
+    const newImages: UploadedImage[] = [];
+    Array.from(files).forEach((file) => {
+      if (validateFile(file)) {
+        const preview = URL.createObjectURL(file);
+        newImages.push({
+          id: Math.random().toString(36).substring(7),
+          file,
+          preview,
+        });
+      }
+    });
+
+    if (newImages.length > 0) {
+      setUploadedImages((prev) => [...prev, ...newImages]);
+    }
+  }, []);
+
+  const removeImage = useCallback((id: string) => {
+    setUploadedImages((prev) => {
+      const image = prev.find((img) => img.id === id);
+      if (image) {
+        URL.revokeObjectURL(image.preview);
+      }
+      return prev.filter((img) => img.id !== id);
+    });
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    handleFileUpload(e.dataTransfer.files);
+  }, [handleFileUpload]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    const imageFiles: File[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) {
+        const file = items[i].getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      const dataTransfer = new DataTransfer();
+      imageFiles.forEach((file) => dataTransfer.items.add(file));
+      handleFileUpload(dataTransfer.files);
+    }
+  }, [handleFileUpload]);
+
+  const handlePaperclipClick = () => {
+    fileInputRef.current?.click();
+  };
 
   return (
-    <div className="w-full max-w-3xl mx-auto flex flex-col items-center">
-      {/* Heading */}
-      <h1 className="text-3xl sm:text-4xl font-semibold text-center mb-8">
+    <div className="w-full max-w-3xl mx-auto flex flex-col items-center px-4 sm:px-6">
+      {/* Heading - Responsive sizing */}
+      <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-center mb-6 sm:mb-8">
         What&apos;s on your mind?
       </h1>
 
-      {/* Main Input Container - No border, just shadow */}
+      {/* Main Input Container */}
       <div className="w-full">
         <div
-          className="border-input bg-background cursor-text rounded-3xl border p-2"
+          ref={containerRef}
+          className={cn(
+            "border-input bg-background cursor-text rounded-3xl border p-2 sm:p-3 transition-colors",
+            isDragging && "border-primary bg-primary/5"
+          )}
           onClick={() => textareaRef.current?.focus()}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
+          {/* Uploaded Images Preview */}
+          {uploadedImages.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2 px-3 sm:px-4">
+              {uploadedImages.map((image) => (
+                <div
+                  key={image.id}
+                  className="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-input"
+                >
+                  <img
+                    src={image.preview}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeImage(image.id);
+                    }}
+                    className="absolute top-1 right-1 w-5 h-5 bg-background/90 hover:bg-background rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Textarea */}
           <Textarea
             ref={textareaRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Describe your website..."
-            className="min-h-[44px] w-full resize-none border-0 bg-transparent text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-4 pt-3 pb-1"
+            onPaste={handlePaste}
+            placeholder={isDragging ? "Drop images here..." : "Describe your website..."}
+            className="min-h-[44px] w-full resize-none border-0 bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
             rows={1}
           />
 
           {/* Actions Row - Inside the container */}
-          <div className="flex items-center justify-between mt-2 px-2 pb-1">
+          <div className="flex items-center justify-between mt-2 px-1 sm:px-2 pb-1">
             {/* Left Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {/* File Upload Button */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => handleFileUpload(e.target.files)}
+              />
               <Button
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 rounded-full border border-input bg-background hover:bg-accent"
+                onClick={handlePaperclipClick}
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-input bg-background hover:bg-accent"
               >
-                <Paperclip className="h-4 w-4" />
+                <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
 
               {/* Model Selector */}
@@ -127,26 +307,28 @@ export function ChatInterface() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-9 rounded-full border border-input bg-background px-3 gap-2 hover:bg-accent"
+                    className="h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent"
                   >
                     {selectedModelData && (
                       <ModelIcon
                         provider={selectedModelData.provider}
-                        className="h-4 w-4"
+                        className="h-3.5 w-3.5 sm:h-4 sm:w-4"
                       />
                     )}
-                    <span className="text-sm">{selectedModelData?.name}</span>
-                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">
+                      {selectedModelData?.name}
+                    </span>
+                    <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-56 p-2" align="start">
+                <PopoverContent className="w-48 sm:w-56 p-2" align="start">
                   <div className="flex flex-col gap-1">
-                    {DUMMY_MODELS.map((model) => (
+                    {MODELS.map((model: Model) => (
                       <Button
                         key={model.id}
                         variant="ghost"
                         className={cn(
-                          "justify-start gap-2 h-9",
+                          "justify-start gap-2 h-8 sm:h-9",
                           selectedModel === model.id && "bg-accent"
                         )}
                         onClick={() => {
@@ -154,8 +336,8 @@ export function ChatInterface() {
                           setIsPopoverOpen(false);
                         }}
                       >
-                        <ModelIcon provider={model.provider} className="h-4 w-4" />
-                        <span className="text-sm">{model.name}</span>
+                        <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="text-xs sm:text-sm">{model.name}</span>
                       </Button>
                     ))}
                   </div>
@@ -167,9 +349,9 @@ export function ChatInterface() {
             <Button
               size="icon"
               disabled={!inputValue.trim()}
-              className="h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              <ArrowUp className="h-4 w-4" />
+              <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>
@@ -177,7 +359,7 @@ export function ChatInterface() {
 
       {/* Suggestion Pills - Horizontal scroll on mobile, wrapped on desktop (Zola style) */}
       <div 
-        className="flex w-full max-w-full flex-nowrap justify-start gap-2 overflow-x-auto px-2 mt-6 md:mx-auto md:max-w-2xl md:flex-wrap md:justify-center md:pl-0"
+        className="flex w-full max-w-full flex-nowrap justify-start gap-2 overflow-x-auto px-2 mt-4 sm:mt-6 md:mx-auto md:max-w-2xl md:flex-wrap md:justify-center md:pl-0"
         style={{ scrollbarWidth: "none" }}
       >
         {SUGGESTIONS.map((suggestion) => {
@@ -186,10 +368,10 @@ export function ChatInterface() {
             <Button
               key={suggestion.id}
               variant="outline"
-              className="h-9 rounded-full border border-input bg-background px-4 hover:bg-accent text-sm gap-2 flex-shrink-0"
+              className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2 flex-shrink-0"
             >
-              <IconComponent className="h-4 w-4" />
-              {suggestion.label}
+              <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="whitespace-nowrap">{suggestion.label}</span>
             </Button>
           );
         })}
