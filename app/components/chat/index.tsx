@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { fetchModels, streamChat, type ModelInfo } from "@/lib/api-client";
 import { ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
 import {
   BookOpenText,
@@ -19,37 +20,12 @@ import {
   PaintBrush,
   Sparkle,
 } from "@phosphor-icons/react";
-// Model type definition
-interface Model {
-  id: string;
-  name: string;
-  provider: string;
-}
 
 interface UploadedImage {
   id: string;
   file: File;
   preview: string;
 }
-
-// OpenRouter models with inline SVG icons
-const MODELS: Model[] = [
-  {
-    id: "openai/gpt-oss-120b:free",
-    name: "GPT-OSS 120B",
-    provider: "openai",
-  },
-  {
-    id: "z-ai/glm-4.5-air:free",
-    name: "GLM 4.5 Air",
-    provider: "zai",
-  },
-  {
-    id: "google/gemma-3-27b-it:free",
-    name: "Gemma 3 27B",
-    provider: "gemma",
-  },
-];
 
 // Suggestions data with icons from Zola
 const SUGGESTIONS = [
@@ -111,13 +87,22 @@ function ModelIcon({ provider, className }: { provider: string; className?: stri
 
 export function ChatInterface() {
   const [inputValue, setInputValue] = useState("");
-  const [selectedModel, setSelectedModel] = useState(MODELS[0].id);
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [modelsStatus, setModelsStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [modelsError, setModelsError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState("");
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [responseText, setResponseText] = useState("");
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -137,7 +122,44 @@ export function ChatInterface() {
     };
   }, [uploadedImages]);
 
-  const selectedModelData = MODELS.find((m: Model) => m.id === selectedModel);
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    setModelsStatus("loading");
+    setModelsError(null);
+
+    fetchModels(controller.signal)
+      .then((data) => {
+        if (!active) return;
+        setModels(data);
+        setSelectedModel((prev) => {
+          if (prev && data.some((model) => model.id === prev)) return prev;
+          return data[0]?.id ?? "";
+        });
+        setModelsStatus("idle");
+      })
+      .catch((error) => {
+        if (!active || controller.signal.aborted) return;
+        setModelsStatus("error");
+        setModelsError(
+          error instanceof Error ? error.message : "Failed to load models."
+        );
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  const selectedModelData = models.find((m: ModelInfo) => m.id === selectedModel);
 
   const validateFile = (file: File): boolean => {
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
@@ -222,6 +244,66 @@ export function ChatInterface() {
     fileInputRef.current?.click();
   };
 
+  const handleSubmit = useCallback(async () => {
+    const trimmedInput = inputValue.trim();
+    if (!trimmedInput || !selectedModel || isStreaming) return;
+
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const requestId = ++requestIdRef.current;
+
+    setHasSubmitted(true);
+    setIsStreaming(true);
+    setRequestError(null);
+    setResponseText("");
+    setInputValue("");
+
+    try {
+      await streamChat(
+        {
+          model: selectedModel,
+          input: trimmedInput,
+          stream: true,
+        },
+        {
+          onToken: (token) => {
+            if (!token) return;
+            if (requestIdRef.current !== requestId) return;
+            setResponseText((prev) => prev + token);
+          },
+          onError: (message) => {
+            if (requestIdRef.current !== requestId) return;
+            setRequestError(message);
+          },
+        },
+        controller.signal
+      );
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (requestIdRef.current !== requestId) return;
+      setRequestError(
+        error instanceof Error ? error.message : "Something went wrong."
+      );
+    } finally {
+      if (requestIdRef.current === requestId) {
+        setIsStreaming(false);
+      }
+    }
+  }, [inputValue, isStreaming, selectedModel]);
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit]
+  );
+
+  const canSubmit = Boolean(inputValue.trim()) && Boolean(selectedModel) && !isStreaming;
+
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col items-center px-4 sm:px-6">
       {/* Heading - Responsive sizing */}
@@ -275,6 +357,7 @@ export function ChatInterface() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onPaste={handlePaste}
+            onKeyDown={handleKeyDown}
             placeholder={isDragging ? "Drop images here..." : "Describe your website..."}
             className="min-h-[44px] w-full resize-none border-0 bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
             rows={1}
@@ -316,14 +399,32 @@ export function ChatInterface() {
                       />
                     )}
                     <span className="text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">
-                      {selectedModelData?.name}
+                      {selectedModelData?.name ??
+                        (modelsStatus === "loading"
+                          ? "Loading models..."
+                          : "Select a model")}
                     </span>
                     <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-48 sm:w-56 p-2" align="start">
                   <div className="flex flex-col gap-1">
-                    {MODELS.map((model: Model) => (
+                    {modelsStatus === "loading" && (
+                      <span className="px-2 py-1 text-xs text-muted-foreground">
+                        Loading models...
+                      </span>
+                    )}
+                    {modelsStatus === "error" && (
+                      <span className="px-2 py-1 text-xs text-destructive">
+                        {modelsError ?? "Failed to load models."}
+                      </span>
+                    )}
+                    {modelsStatus !== "loading" && models.length === 0 && modelsStatus !== "error" && (
+                      <span className="px-2 py-1 text-xs text-muted-foreground">
+                        No models available.
+                      </span>
+                    )}
+                    {models.map((model: ModelInfo) => (
                       <Button
                         key={model.id}
                         variant="ghost"
@@ -348,7 +449,8 @@ export function ChatInterface() {
             {/* Right Action - Send Button */}
             <Button
               size="icon"
-              disabled={!inputValue.trim()}
+              disabled={!canSubmit}
+              onClick={handleSubmit}
               className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -356,6 +458,30 @@ export function ChatInterface() {
           </div>
         </div>
       </div>
+
+      {hasSubmitted && (
+        <div className="w-full mt-4 rounded-2xl border border-input bg-background/80 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+              Response
+            </span>
+            {isStreaming && (
+              <span className="text-xs text-muted-foreground">Streaming...</span>
+            )}
+          </div>
+          {requestError ? (
+            <p className="text-sm text-destructive">{requestError}</p>
+          ) : responseText ? (
+            <p className="whitespace-pre-wrap text-sm sm:text-base text-foreground">
+              {responseText}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {isStreaming ? "Thinking..." : "No response yet."}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Suggestion Pills - Horizontal scroll on mobile, wrapped on desktop (Zola style) */}
       <div 
