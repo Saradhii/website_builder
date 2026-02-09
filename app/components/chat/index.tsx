@@ -12,13 +12,12 @@ import { cn } from "@/lib/utils";
 import { fetchModels, streamChat, type ModelInfo } from "@/lib/api-client";
 import { ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
 import {
-  BookOpenText,
-  Brain,
-  Code,
-  Lightbulb,
-  Notepad,
-  PaintBrush,
-  Sparkle,
+  Article,
+  Briefcase,
+  Envelope,
+  FileText,
+  Gift,
+  Globe,
 } from "@phosphor-icons/react";
 
 interface UploadedImage {
@@ -27,15 +26,43 @@ interface UploadedImage {
   preview: string;
 }
 
-// Suggestions data with icons from Zola
 const SUGGESTIONS = [
-  { id: "summary", label: "Summary", icon: Notepad },
-  { id: "code", label: "Code", icon: Code },
-  { id: "design", label: "Design", icon: PaintBrush },
-  { id: "research", label: "Research", icon: BookOpenText },
-  { id: "inspired", label: "Get Inspired", icon: Sparkle },
-  { id: "deeply", label: "Think Deeply", icon: Brain },
-  { id: "gently", label: "Learn Gently", icon: Lightbulb },
+  {
+    id: "invitation",
+    label: "Invitation",
+    icon: Envelope,
+    prompt: "Create an elegant event invitation card with a gradient background. Include a hero title, event date & time display, venue location with an address, RSVP button with a countdown timer, and a footer with contact information."
+  },
+  {
+    id: "celebration",
+    label: "Celebration",
+    icon: Gift,
+    prompt: "Design a festive celebration page with confetti animations. Feature a large hero section with the celebration title, a photo gallery grid to showcase memories, a guestbook section where people can leave messages, and a share button to invite others."
+  },
+  {
+    id: "portfolio",
+    label: "Portfolio",
+    icon: Briefcase,
+    prompt: "Build a modern personal portfolio website with a dark theme. Include a hero section with name and title, an about me section with a bio, a projects grid showcasing work with hover effects, a skills section with progress bars, and a contact form with social media links."
+  },
+  {
+    id: "resume",
+    label: "Resume",
+    icon: FileText,
+    prompt: "Create a professional single-page resume with a clean layout. Include a header with name and contact details, a professional summary section, work experience with timeline formatting, education section, technical skills with tags, and a downloadable resume button."
+  },
+  {
+    id: "blog",
+    label: "Blog",
+    icon: Article,
+    prompt: "Design a minimal blog layout with a light theme. Feature a hero section with the blog title, a featured article card with large image, a grid of recent blog posts with excerpts, a sidebar with categories and about author section, and a newsletter signup form."
+  },
+  {
+    id: "landing",
+    label: "Landing Page",
+    icon: Globe,
+    prompt: "Build a high-converting product landing page. Include a sticky navigation bar, a hero section with headline and CTA button, a features section with icon cards, a how-it-works section with steps, customer testimonials in a carousel, pricing comparison table, and a final CTA section with footer."
+  },
 ];
 
 // Accepted image MIME types
@@ -98,6 +125,7 @@ export function ChatInterface() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -248,9 +276,8 @@ export function ChatInterface() {
     const trimmedInput = inputValue.trim();
     if (!trimmedInput || !selectedModel || isStreaming) return;
 
+    // API temporarily disabled for UI development
     abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
     const requestId = ++requestIdRef.current;
 
     setHasSubmitted(true);
@@ -258,6 +285,18 @@ export function ChatInterface() {
     setRequestError(null);
     setResponseText("");
     setInputValue("");
+
+    // Mock response for UI testing
+    setTimeout(() => {
+      if (requestIdRef.current === requestId) {
+        setResponseText("API disabled - UI mode active.\n\nThis is a mock response. The actual API call has been temporarily disabled while working on the UI.");
+        setIsStreaming(false);
+      }
+    }, 1000);
+
+    /* Actual API call (disabled for now)
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       await streamChat(
@@ -290,29 +329,47 @@ export function ChatInterface() {
         setIsStreaming(false);
       }
     }
+    */
   }, [inputValue, isStreaming, selectedModel]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
+        // Trigger transition animation on first Enter
+        if (!isInteracting) {
+          setIsInteracting(true);
+        }
         handleSubmit();
       }
     },
-    [handleSubmit]
+    [handleSubmit, isInteracting]
   );
 
   const canSubmit = Boolean(inputValue.trim()) && Boolean(selectedModel) && !isStreaming;
 
   return (
-    <div className="w-full max-w-3xl mx-auto flex flex-col items-center px-4 sm:px-6">
-      {/* Heading - Responsive sizing */}
-      <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-center mb-6 sm:mb-8">
-        What&apos;s on your mind?
-      </h1>
+    <div className={cn(
+      "w-full transition-all duration-700 ease-in-out left-1/2 -translate-x-1/2",
+      isInteracting
+        ? "fixed bottom-6 max-w-2xl px-4"
+        : "relative max-w-3xl mx-auto flex flex-col items-center px-4 sm:px-6"
+    )}>
+      {/* Heading - hides instantly when interacting */}
+      <div className={cn(
+        "min-h-[4.5rem]",
+        isInteracting ? "opacity-0 pointer-events-none" : ""
+      )}>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-center mb-6 sm:mb-8">
+          Build what&apos;s on your mind.
+        </h1>
+      </div>
 
       {/* Main Input Container */}
-      <div className="w-full">
+      <div className={cn(
+        "w-full",
+        !isInteracting && "block"
+      )}>
         <div
           ref={containerRef}
           className={cn(
@@ -446,20 +503,35 @@ export function ChatInterface() {
               </Popover>
             </div>
 
-            {/* Right Action - Send Button */}
-            <Button
-              size="icon"
-              disabled={!canSubmit}
-              onClick={handleSubmit}
-              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            </Button>
+            {/* Right Actions - Clear & Send */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Clear Button - Only show when there's input */}
+              {inputValue.trim() && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setInputValue("")}
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-input bg-background hover:bg-accent"
+                >
+                  <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button>
+              )}
+              {/* Send Button */}
+              <Button
+                size="icon"
+                disabled={!canSubmit}
+                onClick={handleSubmit}
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      {hasSubmitted && (
+      {/* Response card - temporarily hidden for UI redesign */}
+      {/* {hasSubmitted && (
         <div className="w-full mt-4 rounded-2xl border border-input bg-background/80 p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -481,11 +553,16 @@ export function ChatInterface() {
             </p>
           )}
         </div>
-      )}
+      )} */}
 
-      {/* Suggestion Pills - Horizontal scroll on mobile, wrapped on desktop (Zola style) */}
-      <div 
-        className="flex w-full max-w-full flex-nowrap justify-start gap-2 overflow-x-auto px-2 mt-4 sm:mt-6 md:mx-auto md:max-w-2xl md:flex-wrap md:justify-center md:pl-0"
+      {/* Suggestion Pills - subtle fade out animation */}
+      <div
+        className={cn(
+          "flex w-full max-w-full flex-nowrap justify-start gap-2 overflow-x-auto transition-all duration-700 ease-in-out delay-100 origin-top min-h-[2.5rem]",
+          isInteracting
+            ? "opacity-0 pointer-events-none mt-4 sm:mt-6 px-2"
+            : "mt-4 sm:mt-6 px-2 md:mx-auto md:max-w-2xl md:flex-wrap md:justify-center md:pl-0"
+        )}
         style={{ scrollbarWidth: "none" }}
       >
         {SUGGESTIONS.map((suggestion) => {
@@ -495,6 +572,10 @@ export function ChatInterface() {
               key={suggestion.id}
               variant="outline"
               className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2 flex-shrink-0"
+              onClick={() => {
+                setInputValue(suggestion.prompt);
+                textareaRef.current?.focus();
+              }}
             >
               <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="whitespace-nowrap">{suggestion.label}</span>
