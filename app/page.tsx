@@ -9,7 +9,7 @@ export default function Home() {
       blur={10}
       speed="fast"
     >
-      <div className="h-full w-full flex items-center justify-center p-4">
+      <div className="min-h-screen w-full flex items-center justify-center p-4">
         <ChatInterface />
       </div>
     </WavyBackground>

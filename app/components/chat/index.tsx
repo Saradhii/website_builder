@@ -3,14 +3,19 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { fetchModels, streamChat, type ModelInfo } from "@/lib/api-client";
-import { ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
+import {
+  fetchModels,
+  streamChat,
+  type ModelInfo,
+} from "@/lib/api-client";
+import { ArrowUp, ChevronDown, ExternalLink, Paperclip, X } from "lucide-react";
 import {
   Article,
   Briefcase,
@@ -26,44 +31,345 @@ interface UploadedImage {
   preview: string;
 }
 
-const SUGGESTIONS = [
+interface Suggestion {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  prompt: string;
+  templateHtml?: string;
+}
+
+interface ConversationMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
+const PORTFOLIO_TEMPLATE_HTML = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alex Carter - Portfolio</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #111827;
+      --card: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22d3ee;
+      --accent-2: #38bdf8;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at 20% 0%, #1e293b, var(--bg) 45%);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .container {
+      width: min(1100px, 92%);
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 1.25rem 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(8px);
+      background: rgba(15, 23, 42, 0.7);
+    }
+
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.95rem;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 2rem;
+      padding: 5rem 0 3rem;
+      align-items: center;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.3rem);
+      line-height: 1.1;
+    }
+
+    .hero p {
+      color: var(--muted);
+      margin-top: 1rem;
+      font-size: 1.05rem;
+    }
+
+    .cta-row {
+      margin-top: 1.5rem;
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      padding: 0.7rem 1rem;
+      border-radius: 999px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn.primary {
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      color: #00131a;
+    }
+
+    .btn.ghost {
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .hero-card {
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.25rem;
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.08), rgba(15, 23, 42, 0.4));
+    }
+
+    section {
+      padding: 1.8rem 0;
+    }
+
+    .section-title {
+      margin: 0 0 1rem;
+      font-size: 1.4rem;
+    }
+
+    .projects {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .project {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.85rem;
+      padding: 1rem;
+    }
+
+    .project h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .project p {
+      margin: 0.65rem 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .skills {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .skill {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .contact {
+      border: 1px solid var(--border);
+      border-radius: 0.9rem;
+      padding: 1rem;
+      background: rgba(17, 24, 39, 0.7);
+    }
+
+    .contact p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    footer {
+      padding: 2rem 0 3rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    @media (max-width: 920px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .projects {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .projects {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <div class="brand">Alex Carter</div>
+      <nav class="nav-links">
+        <a href="#about">About</a>
+        <a href="#projects">Projects</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero" id="about">
+      <div>
+        <h1>Frontend Engineer Building Fast, Elegant Web Experiences</h1>
+        <p>
+          I design and build modern digital products with a strong focus on usability,
+          accessibility, and performance.
+        </p>
+        <div class="cta-row">
+          <a class="btn primary" href="#projects">View Projects</a>
+          <a class="btn ghost" href="#contact">Contact Me</a>
+        </div>
+      </div>
+      <div class="hero-card">
+        <strong>Currently:</strong>
+        <p>Creating interactive web apps and AI-assisted product prototypes for startups.</p>
+        <div class="skills">
+          <span class="skill">React</span>
+          <span class="skill">TypeScript</span>
+          <span class="skill">Next.js</span>
+          <span class="skill">UI Engineering</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="projects">
+      <h2 class="section-title">Featured Projects</h2>
+      <div class="projects">
+        <article class="project">
+          <h3>Website Builder AI</h3>
+          <p>Prompt-based website generation tool with live preview and instant editing loop.</p>
+        </article>
+        <article class="project">
+          <h3>Analytics Dashboard</h3>
+          <p>Data-heavy admin dashboard with interactive charts and role-based access.</p>
+        </article>
+        <article class="project">
+          <h3>Design System Kit</h3>
+          <p>Reusable component library with tokens, accessibility checks, and docs site.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="contact" class="contact">
+      <h2 class="section-title">Let's Work Together</h2>
+      <p>Email: hello@alexcarter.dev</p>
+      <p>LinkedIn: linkedin.com/in/alexcarter</p>
+    </section>
+  </main>
+
+  <footer>
+    © 2026 Alex Carter. Built with HTML and CSS.
+  </footer>
+</body>
+</html>`;
+
+const SUGGESTIONS: Suggestion[] = [
   {
     id: "invitation",
     label: "Invitation",
     icon: Envelope,
-    prompt: "Create an elegant event invitation card with a gradient background. Include a hero title, event date & time display, venue location with an address, RSVP button with a countdown timer, and a footer with contact information."
+    prompt:
+      "Create an elegant event invitation page with a hero title, date and time section, venue details, RSVP button, and a refined color palette.",
   },
   {
     id: "celebration",
     label: "Celebration",
     icon: Gift,
-    prompt: "Design a festive celebration page with confetti animations. Feature a large hero section with the celebration title, a photo gallery grid to showcase memories, a guestbook section where people can leave messages, and a share button to invite others."
+    prompt:
+      "Design a festive celebration page with confetti-like accents, hero section, photo gallery, guest messages, and a share section.",
   },
   {
     id: "portfolio",
-    label: "Portfolio",
+    label: "Portfolio Template",
     icon: Briefcase,
-    prompt: "Build a modern personal portfolio website with a dark theme. Include a hero section with name and title, an about me section with a bio, a projects grid showcasing work with hover effects, a skills section with progress bars, and a contact form with social media links."
+    templateHtml: PORTFOLIO_TEMPLATE_HTML,
+    prompt:
+      "Use the starter portfolio template and upgrade it with a stronger hero section, better project cards, and improved typography while keeping it single-file HTML and CSS.",
   },
   {
     id: "resume",
     label: "Resume",
     icon: FileText,
-    prompt: "Create a professional single-page resume with a clean layout. Include a header with name and contact details, a professional summary section, work experience with timeline formatting, education section, technical skills with tags, and a downloadable resume button."
+    prompt:
+      "Create a single-page professional resume with a clear hierarchy for summary, experience, education, and technical skills.",
   },
   {
     id: "blog",
     label: "Blog",
     icon: Article,
-    prompt: "Design a minimal blog layout with a light theme. Feature a hero section with the blog title, a featured article card with large image, a grid of recent blog posts with excerpts, a sidebar with categories and about author section, and a newsletter signup form."
+    prompt:
+      "Build a clean blog landing page with featured article section, recent posts grid, author info block, and newsletter form.",
   },
   {
     id: "landing",
     label: "Landing Page",
     icon: Globe,
-    prompt: "Build a high-converting product landing page. Include a sticky navigation bar, a hero section with headline and CTA button, a features section with icon cards, a how-it-works section with steps, customer testimonials in a carousel, pricing comparison table, and a final CTA section with footer."
+    prompt:
+      "Create a product landing page with sticky header, hero CTA, feature cards, testimonials, pricing table, and closing CTA.",
+  },
+  {
+    id: "agency",
+    label: "Agency",
+    icon: Globe,
+    prompt:
+      "Build a modern digital agency website with a bold hero section, services grid, case studies, client logos, team section, and contact CTA.",
   },
 ];
+
+const WEBSITE_SYSTEM_INSTRUCTIONS =
+  "You are a senior web builder assistant. Return exactly one complete HTML document with inline CSS (and inline JS only if needed). Do not include markdown explanations.";
 
 // Accepted image MIME types
 const ACCEPTED_IMAGE_TYPES = [
@@ -78,6 +384,51 @@ const ACCEPTED_IMAGE_TYPES = [
 
 // Max file size in bytes (10MB)
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+function createConversationMessage(
+  role: ConversationMessage["role"],
+  content: string
+): ConversationMessage {
+  return {
+    id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role,
+    content,
+  };
+}
+
+function extractHtmlDocument(response: string): string | null {
+  const fencedMatch = response.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim();
+  }
+
+  const trimmed = response.trim();
+  const lower = trimmed.toLowerCase();
+
+  const doctypeIndex = lower.indexOf("<!doctype");
+  if (doctypeIndex >= 0) {
+    return trimmed.slice(doctypeIndex).trim();
+  }
+
+  const htmlIndex = lower.indexOf("<html");
+  if (htmlIndex >= 0) {
+    return trimmed.slice(htmlIndex).trim();
+  }
+
+  if (trimmed.startsWith("<") && trimmed.includes("</")) {
+    return trimmed;
+  }
+
+  return null;
+}
+
+function buildWebsitePrompt(userPrompt: string, currentHtml?: string) {
+  if (!currentHtml) {
+    return `${WEBSITE_SYSTEM_INSTRUCTIONS}\n\nUser request:\n${userPrompt}`;
+  }
+
+  return `${WEBSITE_SYSTEM_INSTRUCTIONS}\n\nUpdate the existing website based on the user request.\n\nCurrent HTML:\n\`\`\`html\n${currentHtml}\n\`\`\`\n\nUser request:\n${userPrompt}`;
+}
 
 // Model Icon Component using inline SVGs from Lobehub
 function ModelIcon({ provider, className }: { provider: string; className?: string }) {
@@ -121,14 +472,20 @@ export function ChatInterface() {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [responseText, setResponseText] = useState("");
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewExternalUrl, setPreviewExternalUrl] = useState<string | null>(null);
+  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isInteracting, setIsInteracting] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const [showTopBlur, setShowTopBlur] = useState(false);
+  const [showBottomBlur, setShowBottomBlur] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
 
@@ -191,11 +548,11 @@ export function ChatInterface() {
 
   const validateFile = (file: File): boolean => {
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      alert(`File type not supported. Please upload an image file.`);
+      alert("File type not supported. Please upload an image file.");
       return false;
     }
     if (file.size > MAX_FILE_SIZE) {
-      alert(`File too large. Maximum size is 10MB.`);
+      alert("File too large. Maximum size is 10MB.");
       return false;
     }
     return true;
@@ -243,133 +600,310 @@ export function ChatInterface() {
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    handleFileUpload(e.dataTransfer.files);
-  }, [handleFileUpload]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      handleFileUpload(e.dataTransfer.files);
+    },
+    [handleFileUpload]
+  );
 
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    const items = e.clipboardData.items;
-    const imageFiles: File[] = [];
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const items = e.clipboardData.items;
+      const imageFiles: File[] = [];
 
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") !== -1) {
-        const file = items[i].getAsFile();
-        if (file) imageFiles.push(file);
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const file = items[i].getAsFile();
+          if (file) imageFiles.push(file);
+        }
       }
-    }
 
-    if (imageFiles.length > 0) {
-      const dataTransfer = new DataTransfer();
-      imageFiles.forEach((file) => dataTransfer.items.add(file));
-      handleFileUpload(dataTransfer.files);
-    }
-  }, [handleFileUpload]);
+      if (imageFiles.length > 0) {
+        const dataTransfer = new DataTransfer();
+        imageFiles.forEach((file) => dataTransfer.items.add(file));
+        handleFileUpload(dataTransfer.files);
+      }
+    },
+    [handleFileUpload]
+  );
 
   const handlePaperclipClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleSubmit = useCallback(async () => {
-    const trimmedInput = inputValue.trim();
-    if (!trimmedInput || !selectedModel || isStreaming) return;
+  const sendPrompt = useCallback(
+    async (prompt: string, starterHtml?: string, templateName?: string) => {
+      const trimmedPrompt = prompt.trim();
+      if (!trimmedPrompt || !selectedModel || isStreaming) return;
 
-    // API temporarily disabled for UI development
-    abortControllerRef.current?.abort();
-    const requestId = ++requestIdRef.current;
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      const requestId = ++requestIdRef.current;
 
-    setHasSubmitted(true);
-    setIsStreaming(true);
-    setRequestError(null);
-    setResponseText("");
+      const currentHtml = starterHtml ?? previewHtml;
+      if (starterHtml) {
+        setPreviewHtml(starterHtml);
+        setActiveTemplate(templateName ?? "Template");
+      }
+
+      setRequestError(null);
+      setIsStreaming(true);
+      setStreamingText("");
+      setConversation((prev) => [
+        ...prev,
+        createConversationMessage("user", trimmedPrompt),
+      ]);
+
+      let assistantOutput = "";
+
+      try {
+        await streamChat(
+          {
+            model: selectedModel,
+            input: buildWebsitePrompt(trimmedPrompt, currentHtml),
+            stream: true,
+          },
+          {
+            onToken: (token) => {
+              if (!token) return;
+              if (requestIdRef.current !== requestId) return;
+              assistantOutput += token;
+              setStreamingText((prev) => prev + token);
+            },
+            onError: (message) => {
+              if (requestIdRef.current !== requestId) return;
+              setRequestError(message);
+            },
+          },
+          controller.signal
+        );
+
+        if (requestIdRef.current !== requestId) return;
+
+        const html = extractHtmlDocument(assistantOutput);
+        if (html) {
+          setPreviewHtml(html);
+          setConversation((prev) => [
+            ...prev,
+            createConversationMessage(
+              "assistant",
+              "Applied changes to the live HTML/CSS preview. Describe next edits and I will update it."
+            ),
+          ]);
+          return;
+        }
+
+        setConversation((prev) => [
+          ...prev,
+          createConversationMessage(
+            "assistant",
+            assistantOutput.trim() || "No response received from the model."
+          ),
+        ]);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        if (requestIdRef.current !== requestId) return;
+        setRequestError(
+          error instanceof Error ? error.message : "Something went wrong."
+        );
+      } finally {
+        if (requestIdRef.current === requestId) {
+          setIsStreaming(false);
+          setStreamingText("");
+        }
+      }
+    },
+    [isStreaming, previewHtml, selectedModel]
+  );
+
+  const handleSubmit = useCallback(() => {
+    const prompt = inputValue.trim();
+    if (!prompt) return;
     setInputValue("");
+    void sendPrompt(prompt);
+  }, [inputValue, sendPrompt]);
 
-    // Mock response for UI testing
-    setTimeout(() => {
-      if (requestIdRef.current === requestId) {
-        setResponseText("API disabled - UI mode active.\n\nThis is a mock response. The actual API call has been temporarily disabled while working on the UI.");
-        setIsStreaming(false);
+  const handleSuggestionClick = useCallback(
+    (suggestion: Suggestion) => {
+      if (isStreaming) return;
+
+      if (suggestion.templateHtml) {
+        void sendPrompt(suggestion.prompt, suggestion.templateHtml, suggestion.label);
+        return;
       }
-    }, 1000);
 
-    /* Actual API call (disabled for now)
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    try {
-      await streamChat(
-        {
-          model: selectedModel,
-          input: trimmedInput,
-          stream: true,
-        },
-        {
-          onToken: (token) => {
-            if (!token) return;
-            if (requestIdRef.current !== requestId) return;
-            setResponseText((prev) => prev + token);
-          },
-          onError: (message) => {
-            if (requestIdRef.current !== requestId) return;
-            setRequestError(message);
-          },
-        },
-        controller.signal
-      );
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      if (requestIdRef.current !== requestId) return;
-      setRequestError(
-        error instanceof Error ? error.message : "Something went wrong."
-      );
-    } finally {
-      if (requestIdRef.current === requestId) {
-        setIsStreaming(false);
-      }
-    }
-    */
-  }, [inputValue, isStreaming, selectedModel]);
+      setInputValue(suggestion.prompt);
+      textareaRef.current?.focus();
+    },
+    [isStreaming, sendPrompt]
+  );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        // Trigger transition animation on first Enter
-        if (!isInteracting) {
-          setIsInteracting(true);
-        }
         handleSubmit();
       }
     },
-    [handleSubmit, isInteracting]
+    [handleSubmit]
   );
 
   const canSubmit = Boolean(inputValue.trim()) && Boolean(selectedModel) && !isStreaming;
+  const showWorkspace =
+    Boolean(previewHtml) || conversation.length > 0 || isStreaming || Boolean(requestError);
+  const firstRowSuggestions = SUGGESTIONS.slice(0, 5);
+  const secondRowSuggestions = SUGGESTIONS.slice(5);
+  const updateChatScrollState = useCallback(() => {
+    const container = chatScrollRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const canScroll = scrollHeight > clientHeight + 1;
+
+    if (!canScroll) {
+      setShowTopBlur(false);
+      setShowBottomBlur(false);
+      return;
+    }
+
+    setShowTopBlur(scrollTop > 6);
+    setShowBottomBlur(scrollTop + clientHeight < scrollHeight - 6);
+  }, []);
+
+  useEffect(() => {
+    const container = chatScrollRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+    updateChatScrollState();
+  }, [conversation, isStreaming, streamingText, requestError, updateChatScrollState]);
+
+  useEffect(() => {
+    if (!previewHtml) {
+      setPreviewExternalUrl(null);
+      return;
+    }
+
+    const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    setPreviewExternalUrl(url);
+
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [previewHtml]);
 
   return (
-    <div className={cn(
-      "w-full transition-all duration-700 ease-in-out left-1/2 -translate-x-1/2",
-      isInteracting
-        ? "fixed bottom-6 max-w-2xl px-4"
-        : "relative max-w-3xl mx-auto flex flex-col items-center px-4 sm:px-6"
-    )}>
-      {/* Heading - hides instantly when interacting */}
-      <div className={cn(
-        "min-h-[4.5rem]",
-        isInteracting ? "opacity-0 pointer-events-none" : ""
-      )}>
+    <div
+      className={cn(
+        "w-full max-w-6xl mx-auto px-4 sm:px-6 py-6",
+        showWorkspace ? "self-start pt-8 sm:pt-10" : "self-center"
+      )}
+    >
+      {!showWorkspace && (
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-center mb-6 sm:mb-8">
           Build what&apos;s on your mind.
         </h1>
-      </div>
+      )}
 
-      {/* Main Input Container */}
-      <div className={cn(
-        "w-full",
-        !isInteracting && "block"
-      )}>
+      {showWorkspace && (
+        <div className="grid gap-4 md:grid-cols-2 mb-6">
+          <div className="rounded-2xl border border-input bg-background/90 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-input px-4 py-2">
+              <span className="text-sm font-medium">Live Website Preview</span>
+              <div className="flex items-center gap-2">
+                {activeTemplate && (
+                  <span className="text-xs text-muted-foreground">{activeTemplate}</span>
+                )}
+                {previewExternalUrl && (
+                  <Button asChild variant="outline" size="xs" className="h-6">
+                    <a
+                      href={previewExternalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open in New Tab
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </div>
+            {previewHtml ? (
+              <iframe
+                title="Website preview"
+                srcDoc={previewHtml}
+                className="w-full h-[430px] bg-white"
+                sandbox="allow-scripts allow-forms"
+              />
+            ) : (
+              <div className="h-[430px] grid place-items-center text-sm text-muted-foreground">
+                Preview will appear after generation.
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-input bg-background/90 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-input px-4 py-2">
+              <span className="text-sm font-medium">Builder Chat</span>
+              {isStreaming && (
+                <span className="text-xs text-muted-foreground">Streaming...</span>
+              )}
+            </div>
+            <div className="relative h-[430px]">
+              <div
+                ref={chatScrollRef}
+                onScroll={updateChatScrollState}
+                className="h-full overflow-y-auto p-3 space-y-3"
+              >
+                {conversation.length === 0 && !isStreaming && !requestError && (
+                  <p className="text-sm text-muted-foreground">
+                    Pick a suggestion or describe your website to start building.
+                  </p>
+                )}
+
+                {conversation.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      "max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap",
+                      message.role === "user"
+                        ? "ml-auto bg-primary text-primary-foreground"
+                        : "mr-auto bg-muted text-foreground"
+                    )}
+                  >
+                    {message.content}
+                  </div>
+                ))}
+
+                {isStreaming && (
+                  <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap mr-auto bg-muted text-foreground">
+                    {streamingText || "Generating website..."}
+                  </div>
+                )}
+
+                {requestError && (
+                  <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
+                    {requestError}
+                  </div>
+                )}
+              </div>
+              {showTopBlur && (
+                <ProgressiveBlur position="top" height="18%" />
+              )}
+              {showBottomBlur && (
+                <ProgressiveBlur position="bottom" height="18%" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="w-full max-w-3xl mx-auto">
         <div
           ref={containerRef}
           className={cn(
@@ -381,7 +915,6 @@ export function ChatInterface() {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Uploaded Images Preview */}
           {uploadedImages.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2 px-3 sm:px-4">
               {uploadedImages.map((image) => (
@@ -408,23 +941,19 @@ export function ChatInterface() {
             </div>
           )}
 
-          {/* Textarea */}
           <Textarea
             ref={textareaRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onPaste={handlePaste}
             onKeyDown={handleKeyDown}
-            placeholder={isDragging ? "Drop images here..." : "Describe your website..."}
+            placeholder={isDragging ? "Drop images here..." : "Describe your website or ask for a modification..."}
             className="min-h-[44px] w-full resize-none border-0 bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
             rows={1}
           />
 
-          {/* Actions Row - Inside the container */}
           <div className="flex items-center justify-between mt-2 px-1 sm:px-2 pb-1">
-            {/* Left Actions */}
             <div className="flex items-center gap-1 sm:gap-2">
-              {/* File Upload Button */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -442,7 +971,6 @@ export function ChatInterface() {
                 <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
 
-              {/* Model Selector */}
               <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -455,7 +983,7 @@ export function ChatInterface() {
                         className="h-3.5 w-3.5 sm:h-4 sm:w-4"
                       />
                     )}
-                    <span className="text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">
+                    <span className="text-xs sm:text-sm truncate max-w-[110px] sm:max-w-none">
                       {selectedModelData?.name ??
                         (modelsStatus === "loading"
                           ? "Loading models..."
@@ -464,7 +992,7 @@ export function ChatInterface() {
                     <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-48 sm:w-56 p-2" align="start">
+                <PopoverContent className="w-52 sm:w-56 p-2" align="start">
                   <div className="flex flex-col gap-1">
                     {modelsStatus === "loading" && (
                       <span className="px-2 py-1 text-xs text-muted-foreground">
@@ -476,11 +1004,13 @@ export function ChatInterface() {
                         {modelsError ?? "Failed to load models."}
                       </span>
                     )}
-                    {modelsStatus !== "loading" && models.length === 0 && modelsStatus !== "error" && (
-                      <span className="px-2 py-1 text-xs text-muted-foreground">
-                        No models available.
-                      </span>
-                    )}
+                    {modelsStatus !== "loading" &&
+                      models.length === 0 &&
+                      modelsStatus !== "error" && (
+                        <span className="px-2 py-1 text-xs text-muted-foreground">
+                          No models available.
+                        </span>
+                      )}
                     {models.map((model: ModelInfo) => (
                       <Button
                         key={model.id}
@@ -503,9 +1033,7 @@ export function ChatInterface() {
               </Popover>
             </div>
 
-            {/* Right Actions - Clear & Send */}
             <div className="flex items-center gap-1 sm:gap-2">
-              {/* Clear Button - Only show when there's input */}
               {inputValue.trim() && (
                 <Button
                   variant="outline"
@@ -516,7 +1044,6 @@ export function ChatInterface() {
                   <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
               )}
-              {/* Send Button */}
               <Button
                 size="icon"
                 disabled={!canSubmit}
@@ -530,58 +1057,41 @@ export function ChatInterface() {
         </div>
       </div>
 
-      {/* Response card - temporarily hidden for UI redesign */}
-      {/* {hasSubmitted && (
-        <div className="w-full mt-4 rounded-2xl border border-input bg-background/80 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              Response
-            </span>
-            {isStreaming && (
-              <span className="text-xs text-muted-foreground">Streaming...</span>
-            )}
-          </div>
-          {requestError ? (
-            <p className="text-sm text-destructive">{requestError}</p>
-          ) : responseText ? (
-            <p className="whitespace-pre-wrap text-sm sm:text-base text-foreground">
-              {responseText}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {isStreaming ? "Thinking..." : "No response yet."}
-            </p>
-          )}
+      <div className="w-full mt-4 sm:mt-6 px-2 md:mx-auto md:max-w-4xl md:px-0">
+        <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
+          {firstRowSuggestions.map((suggestion) => {
+            const IconComponent = suggestion.icon;
+            return (
+              <Button
+                key={suggestion.id}
+                variant="outline"
+                className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
+                onClick={() => handleSuggestionClick(suggestion)}
+              >
+                <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="whitespace-nowrap">{suggestion.label}</span>
+              </Button>
+            );
+          })}
         </div>
-      )} */}
-
-      {/* Suggestion Pills - subtle fade out animation */}
-      <div
-        className={cn(
-          "flex w-full max-w-full flex-nowrap justify-start gap-2 overflow-x-auto transition-all duration-700 ease-in-out delay-100 origin-top min-h-[2.5rem]",
-          isInteracting
-            ? "opacity-0 pointer-events-none mt-4 sm:mt-6 px-2"
-            : "mt-4 sm:mt-6 px-2 md:mx-auto md:max-w-2xl md:flex-wrap md:justify-center md:pl-0"
+        {secondRowSuggestions.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-2 mt-2">
+            {secondRowSuggestions.map((suggestion) => {
+              const IconComponent = suggestion.icon;
+              return (
+                <Button
+                  key={suggestion.id}
+                  variant="outline"
+                  className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                >
+                  <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="whitespace-nowrap">{suggestion.label}</span>
+                </Button>
+              );
+            })}
+          </div>
         )}
-        style={{ scrollbarWidth: "none" }}
-      >
-        {SUGGESTIONS.map((suggestion) => {
-          const IconComponent = suggestion.icon;
-          return (
-            <Button
-              key={suggestion.id}
-              variant="outline"
-              className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2 flex-shrink-0"
-              onClick={() => {
-                setInputValue(suggestion.prompt);
-                textareaRef.current?.focus();
-              }}
-            >
-              <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="whitespace-nowrap">{suggestion.label}</span>
-            </Button>
-          );
-        })}
       </div>
     </div>
   );
