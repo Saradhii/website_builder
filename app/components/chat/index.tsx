@@ -45,6 +45,8 @@ interface ConversationMessage {
   content: string;
 }
 
+type WorkspaceView = "chat" | "preview";
+
 const PORTFOLIO_TEMPLATE_HTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -479,6 +481,7 @@ export function ChatInterface() {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("chat");
   const [showTopBlur, setShowTopBlur] = useState(false);
   const [showBottomBlur, setShowBottomBlur] = useState(false);
 
@@ -654,6 +657,7 @@ export function ChatInterface() {
       setRequestError(null);
       setIsStreaming(true);
       setStreamingText("");
+      setWorkspaceView("chat");
       setConversation((prev) => [
         ...prev,
         createConversationMessage("user", trimmedPrompt),
@@ -754,8 +758,9 @@ export function ChatInterface() {
   );
 
   const canSubmit = Boolean(inputValue.trim()) && Boolean(selectedModel) && !isStreaming;
+  const hasPreview = Boolean(previewHtml);
   const showWorkspace =
-    Boolean(previewHtml) || conversation.length > 0 || isStreaming || Boolean(requestError);
+    hasPreview || conversation.length > 0 || isStreaming || Boolean(requestError);
   const firstRowSuggestions = SUGGESTIONS.slice(0, 5);
   const secondRowSuggestions = SUGGESTIONS.slice(5);
   const updateChatScrollState = useCallback(() => {
@@ -776,11 +781,25 @@ export function ChatInterface() {
   }, []);
 
   useEffect(() => {
+    if (!hasPreview) {
+      setWorkspaceView("chat");
+    }
+  }, [hasPreview]);
+
+  useEffect(() => {
+    if (workspaceView !== "chat") return;
     const container = chatScrollRef.current;
     if (!container) return;
     container.scrollTop = container.scrollHeight;
     updateChatScrollState();
-  }, [conversation, isStreaming, streamingText, requestError, updateChatScrollState]);
+  }, [
+    conversation,
+    isStreaming,
+    streamingText,
+    requestError,
+    updateChatScrollState,
+    workspaceView,
+  ]);
 
   useEffect(() => {
     if (!previewHtml) {
@@ -801,7 +820,9 @@ export function ChatInterface() {
     <div
       className={cn(
         "w-full max-w-6xl mx-auto px-4 sm:px-6 py-6",
-        showWorkspace ? "self-start pt-8 sm:pt-10" : "self-center"
+        showWorkspace
+          ? "self-start pt-8 sm:pt-10 min-h-full flex flex-col"
+          : "self-center"
       )}
     >
       {!showWorkspace && (
@@ -811,29 +832,59 @@ export function ChatInterface() {
       )}
 
       {showWorkspace && (
-        <div className="grid gap-4 md:grid-cols-2 mb-6">
-          <div className="rounded-2xl border border-input bg-background/90 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-input px-4 py-2">
-              <span className="text-sm font-medium">Live Website Preview</span>
-              <div className="flex items-center gap-2">
-                {activeTemplate && (
-                  <span className="text-xs text-muted-foreground">{activeTemplate}</span>
-                )}
-                {previewExternalUrl && (
-                  <Button asChild variant="outline" size="xs" className="h-6">
-                    <a
-                      href={previewExternalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open in New Tab
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </Button>
-                )}
-              </div>
+        <div className="mb-6 rounded-2xl border border-input bg-background/90 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-input px-4 py-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">
+                {workspaceView === "chat" ? "Builder Chat" : "Live Website Preview"}
+              </span>
+              {activeTemplate && (
+                <span className="text-xs text-muted-foreground">{activeTemplate}</span>
+              )}
+              {workspaceView === "chat" && isStreaming && (
+                <span className="text-xs text-muted-foreground">Streaming...</span>
+              )}
             </div>
-            {previewHtml ? (
+            <div className="flex items-center gap-2">
+              {hasPreview && (
+                <div className="flex items-center gap-1 rounded-full border border-input p-1">
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant={workspaceView === "chat" ? "secondary" : "ghost"}
+                    onClick={() => setWorkspaceView("chat")}
+                    className="rounded-full"
+                  >
+                    Chat
+                  </Button>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant={workspaceView === "preview" ? "secondary" : "ghost"}
+                    onClick={() => setWorkspaceView("preview")}
+                    className="rounded-full"
+                  >
+                    Preview
+                  </Button>
+                </div>
+              )}
+              {workspaceView === "preview" && previewExternalUrl && (
+                <Button asChild variant="outline" size="xs" className="h-6">
+                  <a
+                    href={previewExternalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open in New Tab
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {workspaceView === "preview" ? (
+            hasPreview ? (
               <iframe
                 title="Website preview"
                 srcDoc={previewHtml}
@@ -844,16 +895,8 @@ export function ChatInterface() {
               <div className="h-[430px] grid place-items-center text-sm text-muted-foreground">
                 Preview will appear after generation.
               </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-input bg-background/90 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-input px-4 py-2">
-              <span className="text-sm font-medium">Builder Chat</span>
-              {isStreaming && (
-                <span className="text-xs text-muted-foreground">Streaming...</span>
-              )}
-            </div>
+            )
+          ) : (
             <div className="relative h-[430px]">
               <div
                 ref={chatScrollRef}
@@ -891,6 +934,22 @@ export function ChatInterface() {
                     {requestError}
                   </div>
                 )}
+
+                {hasPreview && !isStreaming && (
+                  <div className="mr-auto max-w-[95%] rounded-xl border border-input bg-muted/40 px-3 py-2">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Latest HTML is ready to preview.
+                    </p>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={() => setWorkspaceView("preview")}
+                    >
+                      View Preview
+                    </Button>
+                  </div>
+                )}
               </div>
               {showTopBlur && (
                 <ProgressiveBlur position="top" height="18%" />
@@ -899,11 +958,11 @@ export function ChatInterface() {
                 <ProgressiveBlur position="bottom" height="18%" />
               )}
             </div>
-          </div>
+          )}
         </div>
       )}
 
-      <div className="w-full max-w-3xl mx-auto">
+      <div className={cn("w-full max-w-3xl mx-auto", showWorkspace && "mt-auto")}>
         <div
           ref={containerRef}
           className={cn(
@@ -1057,26 +1116,10 @@ export function ChatInterface() {
         </div>
       </div>
 
-      <div className="w-full mt-4 sm:mt-6 px-2 md:mx-auto md:max-w-4xl md:px-0">
-        <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
-          {firstRowSuggestions.map((suggestion) => {
-            const IconComponent = suggestion.icon;
-            return (
-              <Button
-                key={suggestion.id}
-                variant="outline"
-                className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
-                onClick={() => handleSuggestionClick(suggestion)}
-              >
-                <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span className="whitespace-nowrap">{suggestion.label}</span>
-              </Button>
-            );
-          })}
-        </div>
-        {secondRowSuggestions.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-2 mt-2">
-            {secondRowSuggestions.map((suggestion) => {
+      {!showWorkspace && (
+        <div className="w-full mt-4 sm:mt-6 px-2 md:mx-auto md:max-w-4xl md:px-0">
+          <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
+            {firstRowSuggestions.map((suggestion) => {
               const IconComponent = suggestion.icon;
               return (
                 <Button
@@ -1091,8 +1134,26 @@ export function ChatInterface() {
               );
             })}
           </div>
-        )}
-      </div>
+          {secondRowSuggestions.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-2 mt-2">
+              {secondRowSuggestions.map((suggestion) => {
+                const IconComponent = suggestion.icon;
+                return (
+                  <Button
+                    key={suggestion.id}
+                    variant="outline"
+                    className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                  >
+                    <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="whitespace-nowrap">{suggestion.label}</span>
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
