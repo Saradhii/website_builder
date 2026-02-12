@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { MonacoEditor } from "@/components/ui/monaco-editor";
 import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import {
   Popover,
@@ -13,16 +15,15 @@ import {
   Tabs,
   TabsContent,
   TabsContents,
-  TabsList,
-  TabsTrigger,
 } from "@/components/animate-ui/components/animate/tabs";
+import { useBuilderWorkspace } from "@/app/components/builder-workspace/context";
 import { cn } from "@/lib/utils";
 import {
   fetchModels,
   streamChat,
   type ModelInfo,
 } from "@/lib/api-client";
-import { ArrowUp, ChevronDown, ExternalLink, Paperclip, X } from "lucide-react";
+import { ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
 import {
   Article,
   Briefcase,
@@ -51,8 +52,6 @@ interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
 }
-
-type WorkspaceView = "chat" | "preview";
 
 const PORTFOLIO_TEMPLATE_HTML = `<!doctype html>
 <html lang="en">
@@ -473,6 +472,13 @@ function ModelIcon({ provider, className }: { provider: string; className?: stri
 }
 
 export function ChatInterface() {
+  const {
+    workspaceView,
+    setWorkspaceView,
+    setHasPreview,
+    setDeployAction,
+  } = useBuilderWorkspace();
+
   const [inputValue, setInputValue] = useState("");
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [modelsStatus, setModelsStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -482,13 +488,11 @@ export function ChatInterface() {
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
-  const [previewExternalUrl, setPreviewExternalUrl] = useState<string | null>(null);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
-  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("chat");
   const [showTopBlur, setShowTopBlur] = useState(false);
   const [showBottomBlur, setShowBottomBlur] = useState(false);
 
@@ -664,7 +668,6 @@ export function ChatInterface() {
       setRequestError(null);
       setIsStreaming(true);
       setStreamingText("");
-      setWorkspaceView("chat");
       setConversation((prev) => [
         ...prev,
         createConversationMessage("user", trimmedPrompt),
@@ -766,10 +769,31 @@ export function ChatInterface() {
 
   const canSubmit = Boolean(inputValue.trim()) && Boolean(selectedModel) && !isStreaming;
   const hasPreview = Boolean(previewHtml);
-  const showWorkspace =
-    hasPreview || conversation.length > 0 || isStreaming || Boolean(requestError);
+  const workspacePanelHeightClass = "h-full";
+  const showStarterSuggestions =
+    workspaceView === "chat" &&
+    !hasPreview &&
+    conversation.length === 0 &&
+    !isStreaming &&
+    !requestError;
   const firstRowSuggestions = SUGGESTIONS.slice(0, 5);
   const secondRowSuggestions = SUGGESTIONS.slice(5);
+  const handleDeployClick = useCallback(() => {
+    if (!previewHtml) return;
+
+    const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const baseName = (activeTemplate ?? "website")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    link.href = url;
+    link.download = `${baseName || "website"}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [activeTemplate, previewHtml]);
   const updateChatScrollState = useCallback(() => {
     const container = chatScrollRef.current;
     if (!container) return;
@@ -788,10 +812,30 @@ export function ChatInterface() {
   }, []);
 
   useEffect(() => {
+    setHasPreview(hasPreview);
+  }, [hasPreview, setHasPreview]);
+
+  useEffect(() => {
+    return () => {
+      setHasPreview(false);
+    };
+  }, [setHasPreview]);
+
+  useEffect(() => {
+    setDeployAction(hasPreview ? handleDeployClick : null);
+  }, [hasPreview, handleDeployClick, setDeployAction]);
+
+  useEffect(() => {
+    return () => {
+      setDeployAction(null);
+    };
+  }, [setDeployAction]);
+
+  useEffect(() => {
     if (!hasPreview) {
       setWorkspaceView("chat");
     }
-  }, [hasPreview]);
+  }, [hasPreview, setWorkspaceView]);
 
   useEffect(() => {
     if (workspaceView !== "chat") return;
@@ -808,345 +852,303 @@ export function ChatInterface() {
     workspaceView,
   ]);
 
-  useEffect(() => {
-    if (!previewHtml) {
-      setPreviewExternalUrl(null);
-      return;
-    }
-
-    const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    setPreviewExternalUrl(url);
-
-    return () => {
-      URL.revokeObjectURL(url);
-    };
-  }, [previewHtml]);
-
   return (
-    <div
-      className={cn(
-        "w-full max-w-6xl mx-auto px-4 sm:px-6 py-6",
-        showWorkspace
-          ? "self-start pt-8 sm:pt-10 min-h-full flex flex-col"
-          : "self-center"
-      )}
-    >
-      {!showWorkspace && (
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-center mb-6 sm:mb-8">
-          Build what&apos;s on your mind.
-        </h1>
-      )}
-
-      {showWorkspace && (
-        <Tabs
-          value={workspaceView}
-          onValueChange={(value) => setWorkspaceView(value as WorkspaceView)}
-          className="mb-6 rounded-2xl border border-input bg-background/90 overflow-hidden"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-input px-4 py-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">
-                {workspaceView === "chat" ? "Builder Chat" : "Live Website Preview"}
-              </span>
-              {activeTemplate && (
-                <span className="text-xs text-muted-foreground">{activeTemplate}</span>
+    <div className="relative h-[calc(100%-1.5rem)] w-[95vw] max-w-[1800px] sm:h-[calc(100%-2rem)]">
+      <Tabs
+        value={workspaceView}
+        className="h-full rounded-2xl border border-input bg-background/90 overflow-hidden"
+      >
+        <TabsContents className="h-full w-full">
+          <TabsContent value="chat" className={cn("relative", workspacePanelHeightClass)}>
+            <div
+              ref={chatScrollRef}
+              onScroll={updateChatScrollState}
+              className="h-full overflow-y-auto p-4 pb-52 space-y-3"
+            >
+              {conversation.length === 0 && !isStreaming && !requestError && (
+                <p className="text-sm text-muted-foreground">
+                  Pick a suggestion or describe your website to start building.
+                </p>
               )}
-              {workspaceView === "chat" && isStreaming && (
-                <span className="text-xs text-muted-foreground">Streaming...</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {hasPreview && (
-                <TabsList>
-                  <TabsTrigger value="chat">Chat</TabsTrigger>
-                  <TabsTrigger value="preview">Preview</TabsTrigger>
-                </TabsList>
-              )}
-              {workspaceView === "preview" && previewExternalUrl && (
-                <Button asChild variant="outline" size="xs" className="h-6">
-                  <a
-                    href={previewExternalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open in New Tab
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </Button>
-              )}
-            </div>
-          </div>
 
-          <TabsContents className="w-full">
-            <TabsContent value="chat" className="relative h-[430px]">
-              <div
-                ref={chatScrollRef}
-                onScroll={updateChatScrollState}
-                className="h-full overflow-y-auto p-3 space-y-3"
-              >
-                {conversation.length === 0 && !isStreaming && !requestError && (
-                  <p className="text-sm text-muted-foreground">
-                    Pick a suggestion or describe your website to start building.
-                  </p>
-                )}
-
-                {conversation.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap",
-                      message.role === "user"
-                        ? "ml-auto bg-primary text-primary-foreground"
-                        : "mr-auto bg-muted text-foreground"
-                    )}
-                  >
-                    {message.content}
-                  </div>
-                ))}
-
-                {isStreaming && (
-                  <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap mr-auto bg-muted text-foreground">
-                    {streamingText || "Generating website..."}
-                  </div>
-                )}
-
-                {requestError && (
-                  <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
-                    {requestError}
-                  </div>
-                )}
-
-                {hasPreview && !isStreaming && (
-                  <div className="mr-auto max-w-[95%] rounded-xl border border-input bg-muted/40 px-3 py-2">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Latest HTML is ready to preview.
-                    </p>
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="outline"
-                      onClick={() => setWorkspaceView("preview")}
-                    >
-                      View Preview
-                    </Button>
-                  </div>
-                )}
-              </div>
-              {showTopBlur && <ProgressiveBlur position="top" height="18%" />}
-              {showBottomBlur && <ProgressiveBlur position="bottom" height="18%" />}
-            </TabsContent>
-
-            <TabsContent value="preview" className="h-[430px]">
-              {hasPreview ? (
-                <iframe
-                  title="Website preview"
-                  srcDoc={previewHtml}
-                  className="w-full h-[430px] bg-white"
-                  sandbox="allow-scripts allow-forms"
-                />
-              ) : (
-                <div className="h-[430px] grid place-items-center text-sm text-muted-foreground">
-                  Preview will appear after generation.
-                </div>
-              )}
-            </TabsContent>
-          </TabsContents>
-        </Tabs>
-      )}
-
-      <div className={cn("w-full max-w-3xl mx-auto", showWorkspace && "mt-auto")}>
-        <div
-          ref={containerRef}
-          className={cn(
-            "border-input bg-background cursor-text rounded-3xl border p-2 sm:p-3 transition-colors",
-            isDragging && "border-primary bg-primary/5"
-          )}
-          onClick={() => textareaRef.current?.focus()}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          {uploadedImages.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2 px-3 sm:px-4">
-              {uploadedImages.map((image) => (
+              {conversation.map((message) => (
                 <div
-                  key={image.id}
-                  className="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-input"
+                  key={message.id}
+                  className={cn(
+                    "max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap",
+                    message.role === "user"
+                      ? "ml-auto bg-primary text-primary-foreground"
+                      : "mr-auto bg-muted text-foreground"
+                  )}
                 >
-                  <img
-                    src={image.preview}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeImage(image.id);
-                    }}
-                    className="absolute top-1 right-1 w-5 h-5 bg-background/90 hover:bg-background rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  {message.content}
                 </div>
               ))}
+
+              {isStreaming && (
+                <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap mr-auto bg-muted text-foreground">
+                  {streamingText || "Generating website..."}
+                </div>
+              )}
+
+              {requestError && (
+                <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
+                  {requestError}
+                </div>
+              )}
+
+              {hasPreview && !isStreaming && (
+                <div className="mr-auto max-w-[95%] rounded-xl border border-input bg-muted/40 px-3 py-2">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Latest HTML is ready to preview.
+                  </p>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => setWorkspaceView("preview")}
+                  >
+                    View Preview
+                  </Button>
+                </div>
+              )}
+            </div>
+            {showTopBlur && <ProgressiveBlur position="top" height="18%" />}
+            {showBottomBlur && <ProgressiveBlur position="bottom" height="18%" />}
+          </TabsContent>
+
+          <TabsContent value="preview" className={workspacePanelHeightClass}>
+            {hasPreview ? (
+              <iframe
+                title="Website preview"
+                srcDoc={previewHtml}
+                className={cn("w-full bg-white", workspacePanelHeightClass)}
+                sandbox="allow-scripts allow-forms"
+              />
+            ) : (
+              <div className={cn(workspacePanelHeightClass, "grid place-items-center text-sm text-muted-foreground")}>
+                Preview will appear after generation.
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="dev" className={workspacePanelHeightClass}>
+            {hasPreview ? (
+              workspaceView === "dev" ? (
+                <MonacoEditor
+                  value={previewHtml}
+                  onChange={setPreviewHtml}
+                  language="html"
+                  className={workspacePanelHeightClass}
+                />
+              ) : (
+                <div className={workspacePanelHeightClass} />
+              )
+            ) : (
+              <div className={cn(workspacePanelHeightClass, "grid place-items-center text-sm text-muted-foreground")}>
+                Code editor will appear after generation.
+              </div>
+            )}
+          </TabsContent>
+        </TabsContents>
+      </Tabs>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-3 sm:px-4">
+        <div className="pointer-events-auto w-full max-w-3xl">
+          {showStarterSuggestions && (
+            <div className="w-full mb-3 px-2 md:px-0">
+              <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
+                {firstRowSuggestions.map((suggestion) => {
+                  const IconComponent = suggestion.icon;
+                  return (
+                    <Button
+                      key={suggestion.id}
+                      variant="outline"
+                      className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <span className="whitespace-nowrap">{suggestion.label}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+              {secondRowSuggestions.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2 mt-2">
+                  {secondRowSuggestions.map((suggestion) => {
+                    const IconComponent = suggestion.icon;
+                    return (
+                      <Button
+                        key={suggestion.id}
+                        variant="outline"
+                        className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
+                        onClick={() => handleSuggestionClick(suggestion)}
+                      >
+                        <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="whitespace-nowrap">{suggestion.label}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
-          <Textarea
-            ref={textareaRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onPaste={handlePaste}
-            onKeyDown={handleKeyDown}
-            placeholder={isDragging ? "Drop images here..." : "Describe your website or ask for a modification..."}
-            className="min-h-[44px] w-full resize-none border-0 bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
-            rows={1}
-          />
-
-          <div className="flex items-center justify-between mt-2 px-1 sm:px-2 pb-1">
-            <div className="flex items-center gap-1 sm:gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => handleFileUpload(e.target.files)}
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handlePaperclipClick}
-                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-input bg-background hover:bg-accent"
-              >
-                <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              </Button>
-
-              <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent"
+          <div
+            ref={containerRef}
+            className={cn(
+              "border-input bg-background cursor-text rounded-3xl border p-2 sm:p-3 transition-colors",
+              isDragging && "border-primary bg-primary/5"
+            )}
+            onClick={() => textareaRef.current?.focus()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {uploadedImages.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2 px-3 sm:px-4">
+                {uploadedImages.map((image) => (
+                  <div
+                    key={image.id}
+                    className="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-input"
                   >
-                    {selectedModelData && (
-                      <ModelIcon
-                        provider={selectedModelData.provider}
-                        className="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                      />
-                    )}
-                    <span className="text-xs sm:text-sm truncate max-w-[110px] sm:max-w-none">
-                      {selectedModelData?.name ??
-                        (modelsStatus === "loading"
-                          ? "Loading models..."
-                          : "Select a model")}
-                    </span>
-                    <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-52 sm:w-56 p-2" align="start">
-                  <div className="flex flex-col gap-1">
-                    {modelsStatus === "loading" && (
-                      <span className="px-2 py-1 text-xs text-muted-foreground">
-                        Loading models...
-                      </span>
-                    )}
-                    {modelsStatus === "error" && (
-                      <span className="px-2 py-1 text-xs text-destructive">
-                        {modelsError ?? "Failed to load models."}
-                      </span>
-                    )}
-                    {modelsStatus !== "loading" &&
-                      models.length === 0 &&
-                      modelsStatus !== "error" && (
-                        <span className="px-2 py-1 text-xs text-muted-foreground">
-                          No models available.
-                        </span>
-                      )}
-                    {models.map((model: ModelInfo) => (
-                      <Button
-                        key={model.id}
-                        variant="ghost"
-                        className={cn(
-                          "justify-start gap-2 h-8 sm:h-9",
-                          selectedModel === model.id && "bg-accent"
-                        )}
-                        onClick={() => {
-                          setSelectedModel(model.id);
-                          setIsPopoverOpen(false);
-                        }}
-                      >
-                        <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        <span className="text-xs sm:text-sm">{model.name}</span>
-                      </Button>
-                    ))}
+                    <Image
+                      src={image.preview}
+                      alt="Preview"
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeImage(image.id);
+                      }}
+                      className="absolute top-1 right-1 w-5 h-5 bg-background/90 hover:bg-background rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
                   </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+                ))}
+              </div>
+            )}
 
-            <div className="flex items-center gap-1 sm:gap-2">
-              {inputValue.trim() && (
+            <Textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onPaste={handlePaste}
+              onKeyDown={handleKeyDown}
+              placeholder={isDragging ? "Drop images here..." : "Describe your website or ask for a modification..."}
+              className="min-h-[44px] w-full resize-none border-0 bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
+              rows={1}
+            />
+
+            <div className="flex items-center justify-between mt-2 px-1 sm:px-2 pb-1">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e.target.files)}
+                />
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setInputValue("")}
+                  onClick={handlePaperclipClick}
                   className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-input bg-background hover:bg-accent"
                 >
-                  <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
-              )}
-              <Button
-                size="icon"
-                disabled={!canSubmit}
-                onClick={handleSubmit}
-                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              </Button>
+
+                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent"
+                    >
+                      {selectedModelData && (
+                        <ModelIcon
+                          provider={selectedModelData.provider}
+                          className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                        />
+                      )}
+                      <span className="text-xs sm:text-sm truncate max-w-[110px] sm:max-w-none">
+                        {selectedModelData?.name ??
+                          (modelsStatus === "loading"
+                            ? "Loading models..."
+                            : "Select a model")}
+                      </span>
+                      <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-52 sm:w-56 p-2" align="start">
+                    <div className="flex flex-col gap-1">
+                      {modelsStatus === "loading" && (
+                        <span className="px-2 py-1 text-xs text-muted-foreground">
+                          Loading models...
+                        </span>
+                      )}
+                      {modelsStatus === "error" && (
+                        <span className="px-2 py-1 text-xs text-destructive">
+                          {modelsError ?? "Failed to load models."}
+                        </span>
+                      )}
+                      {modelsStatus !== "loading" &&
+                        models.length === 0 &&
+                        modelsStatus !== "error" && (
+                          <span className="px-2 py-1 text-xs text-muted-foreground">
+                            No models available.
+                          </span>
+                        )}
+                      {models.map((model: ModelInfo) => (
+                        <Button
+                          key={model.id}
+                          variant="ghost"
+                          className={cn(
+                            "justify-start gap-2 h-8 sm:h-9",
+                            selectedModel === model.id && "bg-accent"
+                          )}
+                          onClick={() => {
+                            setSelectedModel(model.id);
+                            setIsPopoverOpen(false);
+                          }}
+                        >
+                          <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <span className="text-xs sm:text-sm">{model.name}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="flex items-center gap-1 sm:gap-2">
+                {inputValue.trim() && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setInputValue("")}
+                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-input bg-background hover:bg-accent"
+                  >
+                    <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </Button>
+                )}
+                <Button
+                  size="icon"
+                  disabled={!canSubmit}
+                  onClick={handleSubmit}
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      {!showWorkspace && (
-        <div className="w-full mt-4 sm:mt-6 px-2 md:mx-auto md:max-w-4xl md:px-0">
-          <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
-            {firstRowSuggestions.map((suggestion) => {
-              const IconComponent = suggestion.icon;
-              return (
-                <Button
-                  key={suggestion.id}
-                  variant="outline"
-                  className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
-                  onClick={() => handleSuggestionClick(suggestion)}
-                >
-                  <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  <span className="whitespace-nowrap">{suggestion.label}</span>
-                </Button>
-              );
-            })}
-          </div>
-          {secondRowSuggestions.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-2 mt-2">
-              {secondRowSuggestions.map((suggestion) => {
-                const IconComponent = suggestion.icon;
-                return (
-                  <Button
-                    key={suggestion.id}
-                    variant="outline"
-                    className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
-                    onClick={() => handleSuggestionClick(suggestion)}
-                  >
-                    <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    <span className="whitespace-nowrap">{suggestion.label}</span>
-                  </Button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
