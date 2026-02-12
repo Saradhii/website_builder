@@ -9,6 +9,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tabs,
+  TabsContent,
+  TabsContents,
+  TabsList,
+  TabsTrigger,
+} from "@/components/animate-ui/components/animate/tabs";
 import { cn } from "@/lib/utils";
 import {
   fetchModels,
@@ -832,7 +839,11 @@ export function ChatInterface() {
       )}
 
       {showWorkspace && (
-        <div className="mb-6 rounded-2xl border border-input bg-background/90 overflow-hidden">
+        <Tabs
+          value={workspaceView}
+          onValueChange={(value) => setWorkspaceView(value as WorkspaceView)}
+          className="mb-6 rounded-2xl border border-input bg-background/90 overflow-hidden"
+        >
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-input px-4 py-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">
@@ -847,26 +858,10 @@ export function ChatInterface() {
             </div>
             <div className="flex items-center gap-2">
               {hasPreview && (
-                <div className="flex items-center gap-1 rounded-full border border-input p-1">
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant={workspaceView === "chat" ? "secondary" : "ghost"}
-                    onClick={() => setWorkspaceView("chat")}
-                    className="rounded-full"
-                  >
-                    Chat
-                  </Button>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant={workspaceView === "preview" ? "secondary" : "ghost"}
-                    onClick={() => setWorkspaceView("preview")}
-                    className="rounded-full"
-                  >
-                    Preview
-                  </Button>
-                </div>
+                <TabsList>
+                  <TabsTrigger value="chat">Chat</TabsTrigger>
+                  <TabsTrigger value="preview">Preview</TabsTrigger>
+                </TabsList>
               )}
               {workspaceView === "preview" && previewExternalUrl && (
                 <Button asChild variant="outline" size="xs" className="h-6">
@@ -883,21 +878,8 @@ export function ChatInterface() {
             </div>
           </div>
 
-          {workspaceView === "preview" ? (
-            hasPreview ? (
-              <iframe
-                title="Website preview"
-                srcDoc={previewHtml}
-                className="w-full h-[430px] bg-white"
-                sandbox="allow-scripts allow-forms"
-              />
-            ) : (
-              <div className="h-[430px] grid place-items-center text-sm text-muted-foreground">
-                Preview will appear after generation.
-              </div>
-            )
-          ) : (
-            <div className="relative h-[430px]">
+          <TabsContents className="w-full">
+            <TabsContent value="chat" className="relative h-[430px]">
               <div
                 ref={chatScrollRef}
                 onScroll={updateChatScrollState}
@@ -951,15 +933,26 @@ export function ChatInterface() {
                   </div>
                 )}
               </div>
-              {showTopBlur && (
-                <ProgressiveBlur position="top" height="18%" />
+              {showTopBlur && <ProgressiveBlur position="top" height="18%" />}
+              {showBottomBlur && <ProgressiveBlur position="bottom" height="18%" />}
+            </TabsContent>
+
+            <TabsContent value="preview" className="h-[430px]">
+              {hasPreview ? (
+                <iframe
+                  title="Website preview"
+                  srcDoc={previewHtml}
+                  className="w-full h-[430px] bg-white"
+                  sandbox="allow-scripts allow-forms"
+                />
+              ) : (
+                <div className="h-[430px] grid place-items-center text-sm text-muted-foreground">
+                  Preview will appear after generation.
+                </div>
               )}
-              {showBottomBlur && (
-                <ProgressiveBlur position="bottom" height="18%" />
-              )}
-            </div>
-          )}
-        </div>
+            </TabsContent>
+          </TabsContents>
+        </Tabs>
       )}
 
       <div className={cn("w-full max-w-3xl mx-auto", showWorkspace && "mt-auto")}>
