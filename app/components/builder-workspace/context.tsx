@@ -9,6 +9,8 @@ type DeployAction = (() => void) | null;
 interface BuilderWorkspaceContextValue {
   workspaceView: WorkspaceView;
   setWorkspaceView: (view: WorkspaceView) => void;
+  hasWorkspace: boolean;
+  setHasWorkspace: (value: boolean) => void;
   hasPreview: boolean;
   setHasPreview: (value: boolean) => void;
   deployAction: DeployAction;
@@ -20,6 +22,7 @@ const BuilderWorkspaceContext =
 
 function BuilderWorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [workspaceView, setWorkspaceView] = React.useState<WorkspaceView>("chat");
+  const [hasWorkspace, setHasWorkspace] = React.useState(false);
   const [hasPreview, setHasPreview] = React.useState(false);
   const [deployAction, setDeployActionState] = React.useState<DeployAction>(null);
 
@@ -31,12 +34,14 @@ function BuilderWorkspaceProvider({ children }: { children: React.ReactNode }) {
     () => ({
       workspaceView,
       setWorkspaceView,
+      hasWorkspace,
+      setHasWorkspace,
       hasPreview,
       setHasPreview,
       deployAction,
       setDeployAction,
     }),
-    [workspaceView, hasPreview, deployAction, setDeployAction]
+    [workspaceView, hasWorkspace, hasPreview, deployAction, setDeployAction]
   );
 
   return (
@@ -55,4 +60,3 @@ function useBuilderWorkspace() {
 }
 
 export { BuilderWorkspaceProvider, useBuilderWorkspace };
-

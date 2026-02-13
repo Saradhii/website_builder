@@ -475,6 +475,7 @@ export function ChatInterface() {
   const {
     workspaceView,
     setWorkspaceView,
+    setHasWorkspace,
     setHasPreview,
     setDeployAction,
   } = useBuilderWorkspace();
@@ -769,6 +770,8 @@ export function ChatInterface() {
 
   const canSubmit = Boolean(inputValue.trim()) && Boolean(selectedModel) && !isStreaming;
   const hasPreview = Boolean(previewHtml);
+  const hasWorkspace =
+    hasPreview || conversation.length > 0 || isStreaming || Boolean(requestError);
   const workspacePanelHeightClass = "h-full";
   const showStarterSuggestions =
     workspaceView === "chat" &&
@@ -810,6 +813,16 @@ export function ChatInterface() {
     setShowTopBlur(scrollTop > 6);
     setShowBottomBlur(scrollTop + clientHeight < scrollHeight - 6);
   }, []);
+
+  useEffect(() => {
+    setHasWorkspace(hasWorkspace);
+  }, [hasWorkspace, setHasWorkspace]);
+
+  useEffect(() => {
+    return () => {
+      setHasWorkspace(false);
+    };
+  }, [setHasWorkspace]);
 
   useEffect(() => {
     setHasPreview(hasPreview);

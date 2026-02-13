@@ -17,6 +17,7 @@ export const Navbar = () => {
   const {
     workspaceView,
     setWorkspaceView,
+    hasWorkspace,
     hasPreview,
     deployAction,
   } = useBuilderWorkspace();
@@ -32,7 +33,7 @@ export const Navbar = () => {
       <div className="mx-auto flex h-full w-[95vw] max-w-[1800px] items-center justify-between px-1 sm:px-2">
         <Logo />
 
-        {isHomePage ? (
+        {isHomePage && hasWorkspace ? (
           <div className="flex items-center gap-2">
             <Tabs
               value={workspaceView}
