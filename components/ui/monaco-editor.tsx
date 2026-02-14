@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/app/components/theme-provider";
 
 import type {
   editor,
@@ -39,6 +40,8 @@ function MonacoEditor({
   const editorRef = React.useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = React.useRef<MonacoModule | null>(null);
   const onChangeRef = React.useRef(onChange);
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
 
   React.useEffect(() => {
     onChangeRef.current = onChange;
@@ -56,7 +59,7 @@ function MonacoEditor({
       const instance = monaco.editor.create(containerRef.current, {
         value,
         language,
-        theme: "vs-dark",
+        theme: monacoTheme,
         ...DEFAULT_OPTIONS,
         ...options,
       });
@@ -77,6 +80,12 @@ function MonacoEditor({
     // Intentionally create/dispose the editor once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  React.useEffect(() => {
+    const monaco = monacoRef.current;
+    if (!monaco) return;
+    monaco.editor.setTheme(monacoTheme);
+  }, [monacoTheme]);
 
   React.useEffect(() => {
     const instance = editorRef.current;

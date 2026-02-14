@@ -4,7 +4,6 @@ import { WavyBackground } from "@/components/ui/wavy-background";
 export default function Home() {
   return (
     <WavyBackground
-      backgroundFill="white"
       waveOpacity={0.5}
       blur={10}
       speed="fast"

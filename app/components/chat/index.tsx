@@ -935,7 +935,7 @@ export function ChatInterface() {
               <iframe
                 title="Website preview"
                 srcDoc={previewHtml}
-                className={cn("w-full bg-white", workspacePanelHeightClass)}
+                className={cn("w-full bg-background", workspacePanelHeightClass)}
                 sandbox="allow-scripts allow-forms"
               />
             ) : (
