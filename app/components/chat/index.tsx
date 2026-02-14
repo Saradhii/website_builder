@@ -773,6 +773,11 @@ export function ChatInterface() {
   const hasWorkspace =
     hasPreview || conversation.length > 0 || isStreaming || Boolean(requestError);
   const workspacePanelHeightClass = "h-full";
+  const isInitialState =
+    conversation.length === 0 &&
+    !isStreaming &&
+    !requestError &&
+    !hasPreview;
   const showStarterSuggestions =
     workspaceView === "chat" &&
     !hasPreview &&
@@ -865,6 +870,212 @@ export function ChatInterface() {
     workspaceView,
   ]);
 
+  const renderInputSection = () => (
+    <div className="pointer-events-auto w-full max-w-3xl">
+      <div
+        ref={containerRef}
+        className={cn(
+          "border-input bg-background cursor-text rounded-3xl border p-2 sm:p-3 transition-colors",
+          isDragging && "border-primary bg-primary/5"
+        )}
+        onClick={() => textareaRef.current?.focus()}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {uploadedImages.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2 px-3 sm:px-4">
+            {uploadedImages.map((image) => (
+              <div
+                key={image.id}
+                className="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-input"
+              >
+                <Image
+                  src={image.preview}
+                  alt="Preview"
+                  fill
+                  unoptimized
+                  className="object-cover"
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeImage(image.id);
+                  }}
+                  className="absolute top-1 right-1 w-5 h-5 bg-background/90 hover:bg-background rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Textarea
+          ref={textareaRef}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onPaste={handlePaste}
+          onKeyDown={handleKeyDown}
+          placeholder={isDragging ? "Drop images here..." : "Describe your website or ask for a modification..."}
+          className="min-h-[44px] w-full resize-none border-0 bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
+          rows={1}
+        />
+
+        <div className="flex items-center justify-between mt-2 px-1 sm:px-2 pb-1">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFileUpload(e.target.files)}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handlePaperclipClick}
+              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-input bg-background hover:bg-accent"
+            >
+              <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </Button>
+
+            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent"
+                >
+                  {selectedModelData && (
+                    <ModelIcon
+                      provider={selectedModelData.provider}
+                      className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                    />
+                  )}
+                  <span className="text-xs sm:text-sm truncate max-w-[110px] sm:max-w-none">
+                    {selectedModelData?.name ??
+                      (modelsStatus === "loading"
+                        ? "Loading models..."
+                        : "Select a model")}
+                  </span>
+                  <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-52 sm:w-56 p-2" align="start">
+                <div className="flex flex-col gap-1">
+                  {modelsStatus === "loading" && (
+                    <span className="px-2 py-1 text-xs text-muted-foreground">
+                      Loading models...
+                    </span>
+                  )}
+                  {modelsStatus === "error" && (
+                    <span className="px-2 py-1 text-xs text-destructive">
+                      {modelsError ?? "Failed to load models."}
+                    </span>
+                  )}
+                  {modelsStatus !== "loading" &&
+                    models.length === 0 &&
+                    modelsStatus !== "error" && (
+                      <span className="px-2 py-1 text-xs text-muted-foreground">
+                        No models available.
+                      </span>
+                    )}
+                  {models.map((model: ModelInfo) => (
+                    <Button
+                      key={model.id}
+                      variant="ghost"
+                      className={cn(
+                        "justify-start gap-2 h-8 sm:h-9",
+                        selectedModel === model.id && "bg-accent"
+                      )}
+                      onClick={() => {
+                        setSelectedModel(model.id);
+                        setIsPopoverOpen(false);
+                      }}
+                    >
+                      <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <span className="text-xs sm:text-sm">{model.name}</span>
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="flex items-center gap-1 sm:gap-2">
+            {inputValue.trim() && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setInputValue("")}
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-input bg-background hover:bg-accent"
+              >
+                <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Button>
+            )}
+            <Button
+              size="icon"
+              disabled={!canSubmit}
+              onClick={handleSubmit}
+              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full mt-3 px-2 md:px-0">
+        <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
+          {firstRowSuggestions.map((suggestion) => {
+            const IconComponent = suggestion.icon;
+            return (
+              <Button
+                key={suggestion.id}
+                variant="outline"
+                className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
+                onClick={() => handleSuggestionClick(suggestion)}
+              >
+                <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="whitespace-nowrap">{suggestion.label}</span>
+              </Button>
+            );
+          })}
+        </div>
+        {secondRowSuggestions.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-2 mt-2">
+            {secondRowSuggestions.map((suggestion) => {
+              const IconComponent = suggestion.icon;
+              return (
+                <Button
+                  key={suggestion.id}
+                  variant="outline"
+                  className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                >
+                  <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="whitespace-nowrap">{suggestion.label}</span>
+                </Button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (isInitialState) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center px-3 sm:px-4">
+        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-6">
+          Build what&apos;s on your mind
+        </h1>
+        {renderInputSection()}
+      </div>
+    );
+  }
+
   return (
     <div className="relative h-[calc(100%-1.5rem)] w-[95vw] max-w-[1800px] sm:h-[calc(100%-2rem)]">
       <Tabs
@@ -878,12 +1089,6 @@ export function ChatInterface() {
               onScroll={updateChatScrollState}
               className="h-full overflow-y-auto p-4 pb-52 space-y-3"
             >
-              {conversation.length === 0 && !isStreaming && !requestError && (
-                <p className="text-sm text-muted-foreground">
-                  Pick a suggestion or describe your website to start building.
-                </p>
-              )}
-
               {conversation.map((message) => (
                 <div
                   key={message.id}
@@ -967,200 +1172,7 @@ export function ChatInterface() {
       </Tabs>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-3 sm:px-4">
-        <div className="pointer-events-auto w-full max-w-3xl">
-          {showStarterSuggestions && (
-            <div className="w-full mb-3 px-2 md:px-0">
-              <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
-                {firstRowSuggestions.map((suggestion) => {
-                  const IconComponent = suggestion.icon;
-                  return (
-                    <Button
-                      key={suggestion.id}
-                      variant="outline"
-                      className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                    >
-                      <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                      <span className="whitespace-nowrap">{suggestion.label}</span>
-                    </Button>
-                  );
-                })}
-              </div>
-              {secondRowSuggestions.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-2 mt-2">
-                  {secondRowSuggestions.map((suggestion) => {
-                    const IconComponent = suggestion.icon;
-                    return (
-                      <Button
-                        key={suggestion.id}
-                        variant="outline"
-                        className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
-                        onClick={() => handleSuggestionClick(suggestion)}
-                      >
-                        <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        <span className="whitespace-nowrap">{suggestion.label}</span>
-                      </Button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div
-            ref={containerRef}
-            className={cn(
-              "border-input bg-background cursor-text rounded-3xl border p-2 sm:p-3 transition-colors",
-              isDragging && "border-primary bg-primary/5"
-            )}
-            onClick={() => textareaRef.current?.focus()}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {uploadedImages.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-2 px-3 sm:px-4">
-                {uploadedImages.map((image) => (
-                  <div
-                    key={image.id}
-                    className="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-input"
-                  >
-                    <Image
-                      src={image.preview}
-                      alt="Preview"
-                      fill
-                      unoptimized
-                      className="object-cover"
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeImage(image.id);
-                      }}
-                      className="absolute top-1 right-1 w-5 h-5 bg-background/90 hover:bg-background rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Textarea
-              ref={textareaRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onPaste={handlePaste}
-              onKeyDown={handleKeyDown}
-              placeholder={isDragging ? "Drop images here..." : "Describe your website or ask for a modification..."}
-              className="min-h-[44px] w-full resize-none border-0 bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
-              rows={1}
-            />
-
-            <div className="flex items-center justify-between mt-2 px-1 sm:px-2 pb-1">
-              <div className="flex items-center gap-1 sm:gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => handleFileUpload(e.target.files)}
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handlePaperclipClick}
-                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-input bg-background hover:bg-accent"
-                >
-                  <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </Button>
-
-                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent"
-                    >
-                      {selectedModelData && (
-                        <ModelIcon
-                          provider={selectedModelData.provider}
-                          className="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                        />
-                      )}
-                      <span className="text-xs sm:text-sm truncate max-w-[110px] sm:max-w-none">
-                        {selectedModelData?.name ??
-                          (modelsStatus === "loading"
-                            ? "Loading models..."
-                            : "Select a model")}
-                      </span>
-                      <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-52 sm:w-56 p-2" align="start">
-                    <div className="flex flex-col gap-1">
-                      {modelsStatus === "loading" && (
-                        <span className="px-2 py-1 text-xs text-muted-foreground">
-                          Loading models...
-                        </span>
-                      )}
-                      {modelsStatus === "error" && (
-                        <span className="px-2 py-1 text-xs text-destructive">
-                          {modelsError ?? "Failed to load models."}
-                        </span>
-                      )}
-                      {modelsStatus !== "loading" &&
-                        models.length === 0 &&
-                        modelsStatus !== "error" && (
-                          <span className="px-2 py-1 text-xs text-muted-foreground">
-                            No models available.
-                          </span>
-                        )}
-                      {models.map((model: ModelInfo) => (
-                        <Button
-                          key={model.id}
-                          variant="ghost"
-                          className={cn(
-                            "justify-start gap-2 h-8 sm:h-9",
-                            selectedModel === model.id && "bg-accent"
-                          )}
-                          onClick={() => {
-                            setSelectedModel(model.id);
-                            setIsPopoverOpen(false);
-                          }}
-                        >
-                          <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          <span className="text-xs sm:text-sm">{model.name}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="flex items-center gap-1 sm:gap-2">
-                {inputValue.trim() && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setInputValue("")}
-                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-input bg-background hover:bg-accent"
-                  >
-                    <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  </Button>
-                )}
-                <Button
-                  size="icon"
-                  disabled={!canSubmit}
-                  onClick={handleSubmit}
-                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                >
-                  <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        {renderInputSection()}
       </div>
     </div>
   );

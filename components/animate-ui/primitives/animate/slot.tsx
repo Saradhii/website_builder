@@ -73,7 +73,7 @@ function Slot<T extends HTMLElement = HTMLElement>({
   return React.cloneElement(children, {
     ...mergedProps,
     ref: mergeRefs(childRef as React.Ref<T>, ref),
-  });
+  } as React.Attributes);
 }
 
 export {
