@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Navbar } from "./components/navbar";
+import { ThemeToggle } from "./components/theme-toggle";
 import { BuilderWorkspaceProvider } from "./components/builder-workspace/context";
 import { ThemeScript, ThemeProviderInner } from "./components/theme-provider";
 
@@ -22,7 +22,9 @@ export default function RootLayout({
       <body className="antialiased h-screen w-screen overflow-hidden flex flex-col">
         <ThemeProviderInner>
           <BuilderWorkspaceProvider>
-            <Navbar />
+            <header className="flex justify-end p-4 relative z-50">
+              <ThemeToggle />
+            </header>
             <main className="flex-1 w-full overflow-hidden">
               {children}
             </main>
