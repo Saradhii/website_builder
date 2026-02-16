@@ -1,21 +1,16 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useId } from "react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { MonacoEditor } from "@/components/ui/monaco-editor";
-import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Tabs,
-  TabsContent,
-  TabsContents,
-} from "@/components/animate-ui/components/animate/tabs";
 import { useBuilderWorkspace } from "@/app/components/builder-workspace/context";
 import { cn } from "@/lib/utils";
 import {
@@ -52,6 +47,29 @@ interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+const MOCK_CONVERSATION: ConversationMessage[] = [
+  {
+    id: "1",
+    role: "user",
+    content: "Create a modern portfolio website for a software developer",
+  },
+  {
+    id: "2",
+    role: "assistant",
+    content: "I've created a modern, dark-themed portfolio website with a hero section, about section, skills, projects showcase, and contact form. The design features a sleek gradient background and smooth animations.",
+  },
+  {
+    id: "3",
+    role: "user",
+    content: "Add a testimonials section below the projects",
+  },
+  {
+    id: "4",
+    role: "assistant",
+    content: "Done! I've added a testimonials section with client quotes, star ratings, and profile images. It blends seamlessly with the existing design.",
+  },
+];
 
 const PORTFOLIO_TEMPLATE_HTML = `<!doctype html>
 <html lang="en">
@@ -472,14 +490,17 @@ function ModelIcon({ provider, className }: { provider: string; className?: stri
 }
 
 export function ChatInterface() {
+  const searchParams = useSearchParams();
+  const isMockMode = searchParams.get('mock') === 'true';
+
   const {
-    workspaceView,
-    setWorkspaceView,
     setHasWorkspace,
     setHasPreview,
     setDeployAction,
   } = useBuilderWorkspace();
 
+  const [isMockReady, setIsMockReady] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [modelsStatus, setModelsStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -494,8 +515,7 @@ export function ChatInterface() {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
-  const [showTopBlur, setShowTopBlur] = useState(false);
-  const [showBottomBlur, setShowBottomBlur] = useState(false);
+  const popoverId = useId();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -503,6 +523,21 @@ export function ChatInterface() {
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isMockMode && !isMockReady) {
+      setIsMockReady(true);
+      setPreviewHtml(PORTFOLIO_TEMPLATE_HTML);
+      setActiveTemplate("Portfolio");
+      setConversation(MOCK_CONVERSATION);
+      setHasWorkspace(true);
+      setHasPreview(true);
+    }
+  }, [isMockMode, isMockReady, setHasWorkspace, setHasPreview]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -772,14 +807,16 @@ export function ChatInterface() {
   const hasPreview = Boolean(previewHtml);
   const hasWorkspace =
     hasPreview || conversation.length > 0 || isStreaming || Boolean(requestError);
-  const workspacePanelHeightClass = "h-full";
   const isInitialState =
+    isMounted &&
+    !isMockMode &&
     conversation.length === 0 &&
     !isStreaming &&
     !requestError &&
     !hasPreview;
   const showStarterSuggestions =
-    workspaceView === "chat" &&
+    isMounted &&
+    !isMockMode &&
     !hasPreview &&
     conversation.length === 0 &&
     !isStreaming &&
@@ -802,22 +839,6 @@ export function ChatInterface() {
     link.click();
     URL.revokeObjectURL(url);
   }, [activeTemplate, previewHtml]);
-  const updateChatScrollState = useCallback(() => {
-    const container = chatScrollRef.current;
-    if (!container) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    const canScroll = scrollHeight > clientHeight + 1;
-
-    if (!canScroll) {
-      setShowTopBlur(false);
-      setShowBottomBlur(false);
-      return;
-    }
-
-    setShowTopBlur(scrollTop > 6);
-    setShowBottomBlur(scrollTop + clientHeight < scrollHeight - 6);
-  }, []);
 
   useEffect(() => {
     setHasWorkspace(hasWorkspace);
@@ -850,24 +871,14 @@ export function ChatInterface() {
   }, [setDeployAction]);
 
   useEffect(() => {
-    if (!hasPreview) {
-      setWorkspaceView("chat");
-    }
-  }, [hasPreview, setWorkspaceView]);
-
-  useEffect(() => {
-    if (workspaceView !== "chat") return;
     const container = chatScrollRef.current;
     if (!container) return;
     container.scrollTop = container.scrollHeight;
-    updateChatScrollState();
   }, [
     conversation,
     isStreaming,
     streamingText,
     requestError,
-    updateChatScrollState,
-    workspaceView,
   ]);
 
   const renderInputSection = () => (
@@ -875,7 +886,7 @@ export function ChatInterface() {
       <div
         ref={containerRef}
         className={cn(
-          "border-input bg-background cursor-text rounded-3xl border p-2 sm:p-3 transition-colors",
+          "border-input bg-background/90 cursor-text rounded-3xl border p-2 sm:p-3 transition-colors",
           isDragging && "border-primary bg-primary/5"
         )}
         onClick={() => textareaRef.current?.focus()}
@@ -944,6 +955,7 @@ export function ChatInterface() {
             <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
+                  id={popoverId}
                   variant="outline"
                   className="h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent"
                 >
@@ -1026,26 +1038,10 @@ export function ChatInterface() {
         </div>
       </div>
 
-      <div className="w-full mt-3 px-2 md:px-0">
-        <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
-          {firstRowSuggestions.map((suggestion) => {
-            const IconComponent = suggestion.icon;
-            return (
-              <Button
-                key={suggestion.id}
-                variant="outline"
-                className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
-                onClick={() => handleSuggestionClick(suggestion)}
-              >
-                <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span className="whitespace-nowrap">{suggestion.label}</span>
-              </Button>
-            );
-          })}
-        </div>
-        {secondRowSuggestions.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-2 mt-2">
-            {secondRowSuggestions.map((suggestion) => {
+      {showStarterSuggestions && (
+        <div className="w-full mt-3 px-2 md:px-0">
+          <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
+            {firstRowSuggestions.map((suggestion) => {
               const IconComponent = suggestion.icon;
               return (
                 <Button
@@ -1060,8 +1056,26 @@ export function ChatInterface() {
               );
             })}
           </div>
-        )}
-      </div>
+          {secondRowSuggestions.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-2 mt-2">
+              {secondRowSuggestions.map((suggestion) => {
+                const IconComponent = suggestion.icon;
+                return (
+                  <Button
+                    key={suggestion.id}
+                    variant="outline"
+                    className="h-8 sm:h-9 rounded-full border border-input bg-background px-3 sm:px-4 hover:bg-accent text-xs sm:text-sm gap-1.5 sm:gap-2"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                  >
+                    <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="whitespace-nowrap">{suggestion.label}</span>
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -1077,102 +1091,56 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="relative h-[calc(100%-1.5rem)] w-[95vw] max-w-[1800px] sm:h-[calc(100%-2rem)]">
-      <Tabs
-        value={workspaceView}
-        className="h-full rounded-2xl border border-input bg-background/90 overflow-hidden"
-      >
-        <TabsContents className="h-full w-full">
-          <TabsContent value="chat" className={cn("relative", workspacePanelHeightClass)}>
+    <div className="flex gap-4 h-full w-full p-4">
+      <div className="w-1/2 flex flex-col rounded-2xl border border-input bg-background/90 overflow-hidden">
+        <div
+          ref={chatScrollRef}
+          className="flex-1 overflow-y-auto p-4 space-y-3"
+        >
+          {conversation.map((message) => (
             <div
-              ref={chatScrollRef}
-              onScroll={updateChatScrollState}
-              className="h-full overflow-y-auto p-4 pb-52 space-y-3"
+              key={message.id}
+              className={cn(
+                "max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap",
+                message.role === "user"
+                  ? "ml-auto bg-primary text-primary-foreground"
+                  : "mr-auto bg-muted text-foreground"
+              )}
             >
-              {conversation.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap",
-                    message.role === "user"
-                      ? "ml-auto bg-primary text-primary-foreground"
-                      : "mr-auto bg-muted text-foreground"
-                  )}
-                >
-                  {message.content}
-                </div>
-              ))}
-
-              {isStreaming && (
-                <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap mr-auto bg-muted text-foreground">
-                  {streamingText || "Generating website..."}
-                </div>
-              )}
-
-              {requestError && (
-                <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
-                  {requestError}
-                </div>
-              )}
-
-              {hasPreview && !isStreaming && (
-                <div className="mr-auto max-w-[95%] rounded-xl border border-input bg-muted/40 px-3 py-2">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Latest HTML is ready to preview.
-                  </p>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={() => setWorkspaceView("preview")}
-                  >
-                    View Preview
-                  </Button>
-                </div>
-              )}
+              {message.content}
             </div>
-            {showTopBlur && <ProgressiveBlur position="top" height="18%" />}
-            {showBottomBlur && <ProgressiveBlur position="bottom" height="18%" />}
-          </TabsContent>
+          ))}
 
-          <TabsContent value="preview" className={workspacePanelHeightClass}>
-            {hasPreview ? (
-              <iframe
-                title="Website preview"
-                srcDoc={previewHtml}
-                className={cn("w-full bg-background", workspacePanelHeightClass)}
-                sandbox="allow-scripts allow-forms"
-              />
-            ) : (
-              <div className={cn(workspacePanelHeightClass, "grid place-items-center text-sm text-muted-foreground")}>
-                Preview will appear after generation.
-              </div>
-            )}
-          </TabsContent>
+          {isStreaming && (
+            <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap mr-auto bg-muted text-foreground">
+              {streamingText || "Generating website..."}
+            </div>
+          )}
 
-          <TabsContent value="dev" className={workspacePanelHeightClass}>
-            {hasPreview ? (
-              workspaceView === "dev" ? (
-                <MonacoEditor
-                  value={previewHtml}
-                  onChange={setPreviewHtml}
-                  language="html"
-                  className={workspacePanelHeightClass}
-                />
-              ) : (
-                <div className={workspacePanelHeightClass} />
-              )
-            ) : (
-              <div className={cn(workspacePanelHeightClass, "grid place-items-center text-sm text-muted-foreground")}>
-                Code editor will appear after generation.
-              </div>
-            )}
-          </TabsContent>
-        </TabsContents>
-      </Tabs>
+          {requestError && (
+            <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
+              {requestError}
+            </div>
+          )}
+        </div>
+        <div className="p-3 border-t border-input">
+          {renderInputSection()}
+        </div>
+      </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-3 sm:px-4">
-        {renderInputSection()}
+      <div className="w-1/2 rounded-2xl border border-input bg-background/90 overflow-hidden p-4">
+        {hasPreview ? (
+          <MonacoEditor
+            value={previewHtml}
+            onChange={setPreviewHtml}
+            language="html"
+            className="h-full"
+          />
+        ) : (
+          <div className="h-full grid place-items-center text-sm text-muted-foreground">
+            Code will appear after generation
+          </div>
+        )}
       </div>
     </div>
   );

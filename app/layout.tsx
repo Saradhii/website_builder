@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ThemeToggle } from "./components/theme-toggle";
+import { Navbar } from "./components/navbar";
 import { BuilderWorkspaceProvider } from "./components/builder-workspace/context";
 import { ThemeScript, ThemeProviderInner } from "./components/theme-provider";
+import { WavyBackground } from "@/components/ui/wavy-background";
 
 export const metadata: Metadata = {
   title: "Website Builder",
@@ -22,12 +23,20 @@ export default function RootLayout({
       <body className="antialiased h-screen w-screen overflow-hidden flex flex-col">
         <ThemeProviderInner>
           <BuilderWorkspaceProvider>
-            <header className="flex justify-end p-4 relative z-50">
-              <ThemeToggle />
-            </header>
-            <main className="flex-1 w-full overflow-hidden">
-              {children}
-            </main>
+            <WavyBackground
+              waveOpacity={0.5}
+              blur={10}
+              speed="fast"
+              containerClassName="h-full w-full flex flex-col"
+              className="h-full w-full flex flex-col"
+            >
+              <div className="flex-shrink-0 relative z-50">
+                <Navbar />
+              </div>
+              <main className="flex-1 w-full overflow-hidden min-h-0 relative z-0">
+                {children}
+              </main>
+            </WavyBackground>
           </BuilderWorkspaceProvider>
         </ThemeProviderInner>
       </body>
