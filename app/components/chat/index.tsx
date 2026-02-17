@@ -1101,10 +1101,10 @@ export function ChatInterface() {
             <div
               key={message.id}
               className={cn(
-                "max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap",
+                "relative max-w-[95%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap",
                 message.role === "user"
-                  ? "ml-auto bg-primary text-primary-foreground"
-                  : "mr-auto bg-muted text-foreground"
+                  ? "ml-auto bg-primary text-primary-foreground rounded-br-none after:absolute after:bottom-0 after:right-[-8px] after:w-0 after:h-0 after:border-l-[8px] after:border-l-primary after:border-t-[8px] after:border-t-transparent"
+                  : "mr-auto bg-muted text-foreground rounded-bl-none after:absolute after:bottom-0 after:left-[-8px] after:w-0 after:h-0 after:border-r-[8px] after:border-r-muted after:border-t-[8px] after:border-t-transparent"
               )}
             >
               {message.content}
@@ -1112,7 +1112,7 @@ export function ChatInterface() {
           ))}
 
           {isStreaming && (
-            <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap mr-auto bg-muted text-foreground">
+            <div className="relative max-w-[95%] rounded-2xl rounded-bl-none px-3 py-2 text-sm whitespace-pre-wrap mr-auto bg-muted text-foreground after:absolute after:bottom-0 after:left-[-8px] after:w-0 after:h-0 after:border-r-[8px] after:border-r-muted after:border-t-[8px] after:border-t-transparent">
               {streamingText || "Generating website..."}
             </div>
           )}
