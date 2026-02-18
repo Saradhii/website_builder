@@ -18,6 +18,7 @@ type MonacoEditorProps = {
   language?: string;
   className?: string;
   options?: editor.IStandaloneEditorConstructionOptions;
+  autoScroll?: boolean;
 };
 
 const DEFAULT_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
@@ -27,6 +28,11 @@ const DEFAULT_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   scrollBeyondLastLine: false,
   fontSize: 13,
   tabSize: 2,
+  scrollbar: {
+    verticalScrollbarSize: 8,
+    horizontalScrollbarSize: 8,
+    useShadows: false,
+  },
 };
 
 function MonacoEditor({
@@ -35,6 +41,7 @@ function MonacoEditor({
   language = "html",
   className,
   options,
+  autoScroll,
 }: MonacoEditorProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const editorRef = React.useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -108,7 +115,12 @@ function MonacoEditor({
     if (currentValue !== value) {
       instance.setValue(value);
     }
-  }, [value]);
+
+    if (autoScroll) {
+      const lineCount = instance.getModel()?.getLineCount() || 0;
+      instance.revealLine(lineCount, 1);
+    }
+  }, [value, autoScroll]);
 
   return <div ref={containerRef} className={cn("h-full w-full", className)} />;
 }

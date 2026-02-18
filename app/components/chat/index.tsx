@@ -1113,7 +1113,7 @@ export function ChatInterface() {
 
           {isStreaming && (
             <div className="relative max-w-[95%] rounded-2xl rounded-bl-none px-3 py-2 text-sm whitespace-pre-wrap mr-auto bg-muted text-foreground after:absolute after:bottom-0 after:left-[-8px] after:w-0 after:h-0 after:border-r-[8px] after:border-r-muted after:border-t-[8px] after:border-t-transparent">
-              {streamingText || "Generating website..."}
+              Generating website...
             </div>
           )}
 
@@ -1129,7 +1129,14 @@ export function ChatInterface() {
       </div>
 
       <div className="w-1/2 rounded-2xl border border-input bg-background/90 overflow-hidden p-4">
-        {hasPreview ? (
+        {isStreaming ? (
+          <MonacoEditor
+            value={extractHtmlDocument(streamingText) || streamingText}
+            language="html"
+            className="h-full"
+            autoScroll
+          />
+        ) : hasPreview ? (
           <MonacoEditor
             value={previewHtml}
             onChange={setPreviewHtml}
