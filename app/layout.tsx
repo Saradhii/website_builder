@@ -4,6 +4,7 @@ import { Navbar } from "./components/navbar";
 import { BuilderWorkspaceProvider } from "./components/builder-workspace/context";
 import { ThemeScript, ThemeProviderInner } from "./components/theme-provider";
 import { WavyBackground } from "@/components/ui/wavy-background";
+import { Pointer } from "@/components/ui/pointer";
 
 export const metadata: Metadata = {
   title: "Website Builder",
@@ -37,6 +38,7 @@ export default function RootLayout({
                 {children}
               </main>
             </WavyBackground>
+            <Pointer className="fill-blue-500" />
           </BuilderWorkspaceProvider>
         </ThemeProviderInner>
       </body>

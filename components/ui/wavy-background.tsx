@@ -5,6 +5,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { createNoise3D } from "simplex-noise";
 import { useTheme } from "@/app/components/theme-provider";
 
+export const DEFAULT_WAVE_COLORS = [
+  "#38bdf8",
+  "#818cf8",
+  "#c084fc",
+  "#e879f9",
+  "#22d3ee",
+];
+
 export const WavyBackground = ({
   children,
   className,
@@ -63,13 +71,7 @@ export const WavyBackground = ({
     render();
   };
 
-  const waveColors = colors ?? [
-    "#38bdf8",
-    "#818cf8",
-    "#c084fc",
-    "#e879f9",
-    "#22d3ee",
-  ];
+  const waveColors = colors ?? DEFAULT_WAVE_COLORS;
   const drawWave = (n: number) => {
     nt += getSpeed();
     for (i = 0; i < n; i++) {

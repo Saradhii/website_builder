@@ -1,15 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Bailian } from '@lobehub/icons';
 import { ThemeToggle } from "./theme-toggle";
 import { Binary } from "@/components/animate-ui/icons/binary";
+import { Hammer } from "@/components/animate-ui/icons/hammer";
+import { AnimateIcon } from "@/components/animate-ui/icons/icon";
 
 export function Navbar() {
+  const pathname = usePathname();
+  const isDocsPage = pathname.startsWith("/docs");
+  const navHref = isDocsPage ? "/" : "/docs";
+  const navLabel = isDocsPage ? "BUILD" : "DOCS";
+  const NavIcon = isDocsPage ? Hammer : Binary;
+
   return (
     <header className="relative z-50">
       <div className="max-w-3xl mx-auto px-4 xl:px-0 py-3">
-        <div className="bg-background/90 flex items-center justify-between gap-x-4 rounded-3xl border border-input py-2.5 pl-5 pr-2.5">
+        <div className="bg-transparent flex items-center justify-between gap-x-4 rounded-3xl border border-input/80 py-2.5 pl-5 pr-2.5">
           <div className="flex items-center gap-x-10">
             <Link href="/" title="Home" className="flex items-center gap-2">
               <Bailian.Color className="w-5 h-5 sm:w-7 sm:h-7" />
@@ -19,16 +28,18 @@ export function Navbar() {
             </Link>
             <span className="hidden h-4 w-[1px] bg-neutral-300 dark:bg-neutral-700 lg:block"></span>
           </div>
-          <nav className="hidden lg:block">
+          <nav className="block">
             <ul className="flex items-center">
               <li>
-                <Link
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 transition hover:text-neutral-600 dark:hover:text-neutral-400"
-                  href="/docs"
-                >
-                  <Binary animateOnHover size={16} />
-                  DOCS
-                </Link>
+                <AnimateIcon animateOnHover asChild>
+                  <Link
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 transition hover:text-neutral-600 dark:hover:text-neutral-400"
+                    href={navHref}
+                  >
+                    <NavIcon size={20} />
+                    {navLabel}
+                  </Link>
+                </AnimateIcon>
               </li>
             </ul>
           </nav>

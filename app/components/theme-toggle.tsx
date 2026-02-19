@@ -4,6 +4,8 @@ import * as React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/animate-ui/components/radix/switch";
 import { useTheme } from "@/app/components/theme-provider";
+import { AnimateIcon } from "@/components/animate-ui/icons/icon";
+import { Orbit } from "@/components/animate-ui/icons/orbit";
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -15,9 +17,12 @@ export function ThemeToggle() {
 
   if (!isMounted) {
     return (
-      <Label className="flex items-center gap-x-3 cursor-pointer">
-        <Switch checked={false} />
-      </Label>
+      <AnimateIcon animateOnHover asChild>
+        <Label className="flex items-center gap-x-2 cursor-pointer">
+          <Orbit size={16} className="text-muted-foreground" />
+          <Switch checked={false} />
+        </Label>
+      </AnimateIcon>
     );
   }
 
@@ -28,8 +33,11 @@ export function ThemeToggle() {
   };
 
   return (
-    <Label className="flex items-center gap-x-3 cursor-pointer">
-      <Switch checked={isDark} onCheckedChange={handleToggle} />
-    </Label>
+    <AnimateIcon animateOnHover asChild>
+      <Label className="flex items-center gap-x-2 cursor-pointer">
+        <Orbit size={16} className="text-muted-foreground" />
+        <Switch checked={isDark} onCheckedChange={handleToggle} />
+      </Label>
+    </AnimateIcon>
   );
 }

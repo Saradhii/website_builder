@@ -7,6 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { MonacoEditor } from "@/components/ui/monaco-editor";
 import {
+  Tabs,
+  TabsContent,
+  TabsContents,
+  TabsList,
+  TabsTrigger,
+} from "@/components/animate-ui/components/radix/tabs";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -18,7 +25,16 @@ import {
   streamChat,
   type ModelInfo,
 } from "@/lib/api-client";
-import { ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronDown,
+  Code2,
+  Eye,
+  Loader2,
+  MessageSquare,
+  Paperclip,
+  X,
+} from "lucide-react";
 import {
   Article,
   Briefcase,
@@ -47,6 +63,9 @@ interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+type WorkspaceView = "preview" | "code";
+type LeftPanelView = "chat" | "code";
 
 const MOCK_CONVERSATION: ConversationMessage[] = [
   {
@@ -448,6 +467,55 @@ function extractHtmlDocument(response: string): string | null {
   return null;
 }
 
+function injectIframePointerBridge(html: string): string {
+  const pointerBridge = `
+<style id="magicui-iframe-pointer-style">
+  html, body, body * {
+    cursor: none !important;
+  }
+</style>
+<script>
+  (function () {
+    var MOVE = "magicui:iframe-pointer-move";
+    var LEAVE = "magicui:iframe-pointer-leave";
+    var post = function (payload) {
+      window.parent.postMessage(payload, "*");
+    };
+
+    window.addEventListener(
+      "pointermove",
+      function (event) {
+        post({ type: MOVE, x: event.clientX, y: event.clientY });
+      },
+      { passive: true }
+    );
+
+    window.addEventListener(
+      "pointerleave",
+      function () {
+        post({ type: LEAVE });
+      },
+      { passive: true }
+    );
+
+    window.addEventListener("blur", function () {
+      post({ type: LEAVE });
+    });
+  })();
+</script>
+`;
+
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, `${pointerBridge}</body>`);
+  }
+
+  if (/<\/html>/i.test(html)) {
+    return html.replace(/<\/html>/i, `${pointerBridge}</html>`);
+  }
+
+  return `${html}${pointerBridge}`;
+}
+
 function buildWebsitePrompt(userPrompt: string, currentHtml?: string) {
   if (!currentHtml) {
     return `${WEBSITE_SYSTEM_INSTRUCTIONS}\n\nUser request:\n${userPrompt}`;
@@ -515,6 +583,8 @@ export function ChatInterface() {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>("chat");
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("preview");
   const popoverId = useId();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -805,6 +875,71 @@ export function ChatInterface() {
 
   const canSubmit = Boolean(inputValue.trim()) && Boolean(selectedModel) && !isStreaming;
   const hasPreview = Boolean(previewHtml);
+  const hasStreamingText = Boolean(streamingText.trim());
+  const streamedPreviewHtml = extractHtmlDocument(streamingText) || "";
+  const previewSource = isStreaming
+    ? streamedPreviewHtml || previewHtml
+    : previewHtml;
+  const previewFrameSrcDoc = previewSource
+    ? injectIframePointerBridge(previewSource)
+    : "";
+  const renderGracefulState = ({
+    title,
+    description,
+    pending = false,
+  }: {
+    title: string;
+    description: string;
+    pending?: boolean;
+  }) => (
+    <div className="h-full grid place-items-center px-5">
+      <div className="max-w-sm rounded-xl border border-dashed border-input/70 bg-background/45 px-4 py-4 text-center">
+        <div className="flex items-center justify-center gap-2">
+          {pending && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+          <p className="text-sm font-medium text-foreground/90">{title}</p>
+        </div>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
+  const renderCodeOutput = () => {
+    if (isStreaming) {
+      if (!hasStreamingText && !hasPreview) {
+        return renderGracefulState({
+          title: "Code is still generating",
+          description: "Give it a moment. Fresh output will appear here automatically.",
+          pending: true,
+        });
+      }
+
+      return (
+        <MonacoEditor
+          value={extractHtmlDocument(streamingText) || streamingText || previewHtml}
+          language="html"
+          className="h-full"
+          autoScroll
+        />
+      );
+    }
+
+    if (hasPreview) {
+      return (
+        <MonacoEditor
+          value={previewHtml}
+          onChange={setPreviewHtml}
+          language="html"
+          className="h-full"
+        />
+      );
+    }
+
+    return (
+      renderGracefulState({
+        title: "No code yet",
+        description: "Start with a prompt to generate HTML and see code output.",
+      })
+    );
+  };
   const hasWorkspace =
     hasPreview || conversation.length > 0 || isStreaming || Boolean(requestError);
   const isInitialState =
@@ -875,6 +1010,7 @@ export function ChatInterface() {
     if (!container) return;
     container.scrollTop = container.scrollHeight;
   }, [
+    leftPanelView,
     conversation,
     isStreaming,
     streamingText,
@@ -1093,61 +1229,129 @@ export function ChatInterface() {
   return (
     <div className="flex gap-4 h-full w-full p-4">
       <div className="w-1/2 flex flex-col rounded-2xl border border-input bg-background/90 overflow-hidden">
-        <div
-          ref={chatScrollRef}
-          className="flex-1 overflow-y-auto p-4 space-y-3"
+        <Tabs
+          value={leftPanelView}
+          onValueChange={(value) => setLeftPanelView(value as LeftPanelView)}
+          className="flex-1 min-h-0 gap-0"
         >
-          {conversation.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "relative max-w-[95%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap",
-                message.role === "user"
-                  ? "ml-auto bg-primary text-primary-foreground rounded-br-none after:absolute after:bottom-0 after:right-[-8px] after:w-0 after:h-0 after:border-l-[8px] after:border-l-primary after:border-t-[8px] after:border-t-transparent"
-                  : "mr-auto bg-muted text-foreground rounded-bl-none after:absolute after:bottom-0 after:left-[-8px] after:w-0 after:h-0 after:border-r-[8px] after:border-r-muted after:border-t-[8px] after:border-t-transparent"
-              )}
-            >
-              {message.content}
-            </div>
-          ))}
+          <div className="flex-shrink-0 border-b border-input p-4">
+            <TabsList className="h-8 rounded-lg bg-muted/80 p-0.5">
+              <TabsTrigger
+                value="chat"
+                className="h-full rounded-md px-2.5 text-xs font-semibold"
+              >
+                <MessageSquare className="size-3.5" />
+                Chat
+              </TabsTrigger>
+              <TabsTrigger
+                value="code"
+                className="h-full rounded-md px-2.5 text-xs font-semibold"
+              >
+                <Code2 className="size-3.5" />
+                Code
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          {isStreaming && (
-            <div className="relative max-w-[95%] rounded-2xl rounded-bl-none px-3 py-2 text-sm whitespace-pre-wrap mr-auto bg-muted text-foreground after:absolute after:bottom-0 after:left-[-8px] after:w-0 after:h-0 after:border-r-[8px] after:border-r-muted after:border-t-[8px] after:border-t-transparent">
-              Generating website...
-            </div>
-          )}
+          <TabsContents mode="layout" className="flex-1 min-h-0">
+            <TabsContent value="chat" className="h-full">
+              <div
+                ref={chatScrollRef}
+                className="h-full overflow-y-auto p-4 space-y-3"
+              >
+                {conversation.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      "relative max-w-[95%] rounded-3xl px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap shadow-sm",
+                      message.role === "user"
+                        ? "ml-auto bg-primary text-primary-foreground rounded-br-md"
+                        : "mr-auto bg-muted text-foreground rounded-bl-md"
+                    )}
+                  >
+                    {message.content}
+                  </div>
+                ))}
 
-          {requestError && (
-            <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
-              {requestError}
-            </div>
-          )}
-        </div>
+                {isStreaming && (
+                  <div className="relative max-w-[95%] rounded-3xl rounded-bl-md px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap mr-auto bg-muted text-foreground shadow-sm">
+                    Generating website...
+                  </div>
+                )}
+
+                {requestError && (
+                  <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
+                    {requestError}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="code" className="h-full p-4">
+              {renderCodeOutput()}
+            </TabsContent>
+          </TabsContents>
+        </Tabs>
         <div className="p-3 border-t border-input">
           {renderInputSection()}
         </div>
       </div>
 
       <div className="w-1/2 rounded-2xl border border-input bg-background/90 overflow-hidden p-4">
-        {isStreaming ? (
-          <MonacoEditor
-            value={extractHtmlDocument(streamingText) || streamingText}
-            language="html"
-            className="h-full"
-            autoScroll
-          />
-        ) : hasPreview ? (
-          <MonacoEditor
-            value={previewHtml}
-            onChange={setPreviewHtml}
-            language="html"
-            className="h-full"
-          />
-        ) : (
-          <div className="h-full grid place-items-center text-sm text-muted-foreground">
-            Code will appear after generation
+        <Tabs
+          value={workspaceView}
+          onValueChange={(value) => setWorkspaceView(value as WorkspaceView)}
+          className="h-full gap-4"
+        >
+          <div className="flex-shrink-0 border-b border-input pb-4">
+            <TabsList className="h-8 rounded-lg bg-muted/80 p-0.5">
+              <TabsTrigger
+                value="preview"
+                className="h-full rounded-md px-2.5 text-xs font-semibold"
+              >
+                <Eye className="size-3.5" />
+                Preview
+              </TabsTrigger>
+              <TabsTrigger
+                value="code"
+                className="h-full rounded-md px-2.5 text-xs font-semibold"
+              >
+                <Code2 className="size-3.5" />
+                Code
+              </TabsTrigger>
+            </TabsList>
           </div>
-        )}
+
+          <TabsContents mode="layout" className="flex-1 min-h-0">
+            <TabsContent value="preview" className="h-full">
+              {previewSource ? (
+                <iframe
+                  title="Website preview"
+                  srcDoc={previewFrameSrcDoc}
+                  className="h-full w-full rounded-xl border border-input bg-white"
+                  sandbox="allow-scripts allow-forms allow-modals allow-popups"
+                />
+              ) : (
+                renderGracefulState(
+                  isStreaming
+                    ? {
+                        title: "Preview not ready",
+                        description: "Generation is in progress. Switch to Code to track output.",
+                        pending: true,
+                      }
+                    : {
+                        title: "No preview yet",
+                        description: "Generate a website first, then preview will appear here.",
+                      }
+                )
+              )}
+            </TabsContent>
+
+            <TabsContent value="code" className="h-full">
+              {renderCodeOutput()}
+            </TabsContent>
+          </TabsContents>
+        </Tabs>
       </div>
     </div>
   );

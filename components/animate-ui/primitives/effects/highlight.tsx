@@ -244,9 +244,8 @@ function Highlight<T extends React.ElementType = 'div'>({
       const activeEl = container.querySelector<HTMLElement>(
         `[data-value="${activeValue}"][data-highlight="true"]`,
       );
-      if (activeEl) {
+      if (activeEl)
         safeSetBoundsRef.current?.(activeEl.getBoundingClientRect());
-      }
     };
 
     container.addEventListener('scroll', onScroll, { passive: true });
@@ -465,9 +464,7 @@ function HighlightItem<T extends React.ElementType>({
     if (isActive) {
       updateBounds();
       setActiveClassName(activeClassName ?? '');
-    } else if (!activeValue) {
-      clearBounds();
-    }
+    } else if (!activeValue) clearBounds();
 
     if (shouldUpdateBounds) return () => cancelAnimationFrame(rafId);
   }, [
@@ -641,4 +638,3 @@ export {
   type HighlightProps,
   type HighlightItemProps,
 };
-

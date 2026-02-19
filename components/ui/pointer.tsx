@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   AnimatePresence,
   HTMLMotionProps,
@@ -10,9 +10,13 @@ import {
 
 import { cn } from "@/lib/utils"
 
+const POINTER_CLASS = "magicui-pointer-enabled"
+const IFRAME_POINTER_MOVE_EVENT = "magicui:iframe-pointer-move"
+const IFRAME_POINTER_LEAVE_EVENT = "magicui:iframe-pointer-leave"
+
 /**
  * A custom pointer component that displays an animated cursor.
- * Add this as a child to any component to enable a custom pointer when hovering.
+ * Mount once at app-level to enable a custom pointer for the full site.
  * You can pass custom children to render as the pointer.
  *
  * @component
@@ -23,59 +27,118 @@ export function Pointer({
   style,
   children,
   ...props
-}: HTMLMotionProps<"div">): React.ReactNode {
+}: HTMLMotionProps<"div">): JSX.Element {
   const x = useMotionValue(0)
   const y = useMotionValue(0)
   const [isActive, setIsActive] = useState<boolean>(false)
-  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (typeof window !== "undefined" && containerRef.current) {
-      // Get the parent element directly from the ref
-      const parentElement = containerRef.current.parentElement
+    if (typeof window === "undefined") {
+      return
+    }
 
-      if (parentElement) {
-        // Add cursor-none to parent
-        parentElement.style.cursor = "none"
+    const supportsFinePointer = window.matchMedia("(pointer: fine)").matches
+    if (!supportsFinePointer) {
+      return
+    }
 
-        // Add event listeners to parent
-        const handleMouseMove = (e: MouseEvent) => {
-          x.set(e.clientX)
-          y.set(e.clientY)
-          setIsActive(true)
-        }
+    const rootElement = document.documentElement
+    rootElement.classList.add(POINTER_CLASS)
 
-        const handleMouseEnter = (e: MouseEvent) => {
-          x.set(e.clientX)
-          y.set(e.clientY)
-          setIsActive(true)
-        }
+    const handlePointerMove = (e: PointerEvent) => {
+      x.set(e.clientX)
+      y.set(e.clientY)
+      setIsActive(true)
+    }
 
-        const handleMouseLeave = () => {
-          setIsActive(false)
-        }
+    const handlePointerLeave = () => {
+      setIsActive(false)
+    }
 
-        parentElement.addEventListener("mousemove", handleMouseMove)
-        parentElement.addEventListener("mouseenter", handleMouseEnter)
-        parentElement.addEventListener("mouseleave", handleMouseLeave)
-
-        return () => {
-          parentElement.style.cursor = ""
-          parentElement.removeEventListener("mousemove", handleMouseMove)
-          parentElement.removeEventListener("mouseenter", handleMouseEnter)
-          parentElement.removeEventListener("mouseleave", handleMouseLeave)
-        }
+    const handlePointerOut = (e: PointerEvent) => {
+      // When relatedTarget is null, the pointer left the document (e.g. browser UI).
+      if (!e.relatedTarget) {
+        setIsActive(false)
       }
+    }
+
+    const handleMouseOut = (e: MouseEvent) => {
+      // Fallback for browsers that do not consistently emit pointerleave on window.
+      if (!e.relatedTarget) {
+        setIsActive(false)
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        setIsActive(false)
+      }
+    }
+
+    const handleIframePointerMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== "object") {
+        return
+      }
+
+      const data = event.data as {
+        type?: string
+        x?: number
+        y?: number
+      }
+
+      if (data.type === IFRAME_POINTER_LEAVE_EVENT) {
+        setIsActive(false)
+        return
+      }
+
+      if (data.type !== IFRAME_POINTER_MOVE_EVENT) {
+        return
+      }
+
+      if (typeof data.x !== "number" || typeof data.y !== "number") {
+        return
+      }
+
+      const iframeElement = Array.from(document.querySelectorAll("iframe")).find(
+        (frame) => frame.contentWindow === event.source
+      )
+
+      if (!iframeElement) {
+        return
+      }
+
+      const rect = iframeElement.getBoundingClientRect()
+      x.set(rect.left + data.x)
+      y.set(rect.top + data.y)
+      setIsActive(true)
+    }
+
+    window.addEventListener("pointermove", handlePointerMove)
+    window.addEventListener("pointerleave", handlePointerLeave)
+    window.addEventListener("pointerout", handlePointerOut)
+    window.addEventListener("mouseout", handleMouseOut)
+    window.addEventListener("blur", handlePointerLeave)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("message", handleIframePointerMessage)
+
+    return () => {
+      rootElement.classList.remove(POINTER_CLASS)
+      window.removeEventListener("pointermove", handlePointerMove)
+      window.removeEventListener("pointerleave", handlePointerLeave)
+      window.removeEventListener("pointerout", handlePointerOut)
+      window.removeEventListener("mouseout", handleMouseOut)
+      window.removeEventListener("blur", handlePointerLeave)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("message", handleIframePointerMessage)
     }
   }, [x, y])
 
   return (
     <>
-      <div ref={containerRef} />
       <AnimatePresence>
         {isActive && (
           <motion.div
-            className="pointer-events-none fixed z-50 transform-[translate(-50%,-50%)]"
+            className="pointer-events-none fixed z-[9999] transform-[translate(-50%,-50%)]"
             style={{
               top: y,
               left: x,

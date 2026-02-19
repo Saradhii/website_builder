@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { ChatInterface } from "./components/chat";
-import { Pointer } from "@/components/ui/pointer";
 
 export default function Home() {
   return (
@@ -8,7 +7,6 @@ export default function Home() {
       <Suspense fallback={<div className="text-muted-foreground">Loading...</div>}>
         <div className="relative h-full w-full">
           <ChatInterface />
-          <Pointer className="fill-blue-500" />
         </div>
       </Suspense>
     </div>
