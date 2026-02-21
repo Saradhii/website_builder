@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Code2,
   Eye,
+  ExternalLink,
   Loader2,
   MessageSquare,
   Paperclip,
@@ -975,6 +976,26 @@ export function ChatInterface() {
     URL.revokeObjectURL(url);
   }, [activeTemplate, previewHtml]);
 
+  const handleOpenFullPreview = useCallback(() => {
+    if (!previewHtml) return;
+
+    const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const previewWindow = window.open(url, "_blank", "noopener,noreferrer");
+
+    if (!previewWindow) {
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.click();
+    }
+
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 60_000);
+  }, [previewHtml]);
+
   useEffect(() => {
     setHasWorkspace(hasWorkspace);
   }, [hasWorkspace, setHasWorkspace]);
@@ -1303,7 +1324,7 @@ export function ChatInterface() {
           onValueChange={(value) => setWorkspaceView(value as WorkspaceView)}
           className="h-full gap-4"
         >
-          <div className="flex-shrink-0 border-b border-input pb-4">
+          <div className="flex-shrink-0 border-b border-input pb-4 flex items-center justify-between gap-2">
             <TabsList className="h-8 rounded-lg bg-muted/80 p-0.5">
               <TabsTrigger
                 value="preview"
@@ -1320,6 +1341,17 @@ export function ChatInterface() {
                 Code
               </TabsTrigger>
             </TabsList>
+            {hasPreview && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenFullPreview}
+                className="h-8 rounded-md text-xs"
+              >
+                <ExternalLink className="size-3.5" />
+                Full Preview
+              </Button>
+            )}
           </div>
 
           <TabsContents mode="layout" className="flex-1 min-h-0">
