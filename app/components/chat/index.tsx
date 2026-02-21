@@ -25,15 +25,19 @@ import {
   streamChat,
   type ModelInfo,
 } from "@/lib/api-client";
+import { deployWebsite } from "@/lib/deploy-client";
 import {
   ArrowUp,
+  Check,
   ChevronDown,
   Code2,
+  Copy,
   Eye,
   ExternalLink,
   Loader2,
   MessageSquare,
   Paperclip,
+  Rocket,
   X,
 } from "lucide-react";
 import {
@@ -442,6 +446,12 @@ function createConversationMessage(
   };
 }
 
+function createWebsiteId() {
+  const timestamp = Date.now().toString(36);
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `site-${timestamp}-${suffix}`;
+}
+
 function extractHtmlDocument(response: string): string | null {
   const fencedMatch = response.match(/```(?:html)?\s*([\s\S]*?)```/i);
   if (fencedMatch?.[1]) {
@@ -584,6 +594,12 @@ export function ChatInterface() {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [websiteId] = useState(() => createWebsiteId());
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deployUrl, setDeployUrl] = useState("");
+  const [deployError, setDeployError] = useState<string | null>(null);
+  const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false);
+  const [isDeployLinkCopied, setIsDeployLinkCopied] = useState(false);
   const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>("chat");
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("preview");
   const popoverId = useId();
@@ -960,21 +976,79 @@ export function ChatInterface() {
   const firstRowSuggestions = SUGGESTIONS.slice(0, 5);
   const secondRowSuggestions = SUGGESTIONS.slice(5);
   const handleDeployClick = useCallback(() => {
-    if (!previewHtml) return;
+    if (!previewHtml || isDeploying) return;
 
-    const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const baseName = (activeTemplate ?? "website")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+    setIsDeploying(true);
+    setDeployError(null);
+    setIsDeployLinkCopied(false);
 
-    link.href = url;
-    link.download = `${baseName || "website"}.html`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }, [activeTemplate, previewHtml]);
+    const websiteName = (activeTemplate ?? "website").trim() || "website";
+
+    void deployWebsite({
+      id: websiteId,
+      html: previewHtml,
+      name: websiteName,
+    })
+      .then((response) => {
+        setDeployUrl(response.url);
+        setIsDeployDialogOpen(true);
+      })
+      .catch((error) => {
+        setDeployUrl("");
+        setDeployError(
+          error instanceof Error ? error.message : "Failed to deploy website."
+        );
+        setIsDeployDialogOpen(true);
+      })
+      .finally(() => {
+        setIsDeploying(false);
+      });
+  }, [activeTemplate, isDeploying, previewHtml, websiteId]);
+
+  const handleCopyDeployLink = useCallback(() => {
+    if (!deployUrl) return;
+
+    const copyWithFallback = async () => {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(deployUrl);
+        return;
+      }
+
+      const textarea = document.createElement("textarea");
+      textarea.value = deployUrl;
+      textarea.setAttribute("readonly", "true");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      const copied = document.execCommand("copy");
+      document.body.removeChild(textarea);
+
+      if (!copied) {
+        throw new Error("Unable to copy link.");
+      }
+    };
+
+    void copyWithFallback()
+      .then(() => {
+        setIsDeployLinkCopied(true);
+      })
+      .catch((error) => {
+        setDeployError(
+          error instanceof Error ? error.message : "Unable to copy deploy link."
+        );
+      });
+  }, [deployUrl]);
+
+  const handleOpenDeployedSite = useCallback(() => {
+    if (!deployUrl) return;
+    window.open(deployUrl, "_blank", "noopener,noreferrer");
+  }, [deployUrl]);
+
+  const handleCloseDeployDialog = useCallback(() => {
+    setIsDeployDialogOpen(false);
+  }, []);
 
   const handleOpenFullPreview = useCallback(() => {
     if (!previewHtml) return;
@@ -1037,6 +1111,17 @@ export function ChatInterface() {
     streamingText,
     requestError,
   ]);
+
+  useEffect(() => {
+    if (!isDeployLinkCopied) return;
+    const timeoutId = window.setTimeout(() => {
+      setIsDeployLinkCopied(false);
+    }, 1800);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isDeployLinkCopied]);
 
   const renderInputSection = () => (
     <div className="pointer-events-auto w-full max-w-3xl">
@@ -1248,143 +1333,235 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="flex gap-4 h-full w-full p-4">
-      <div className="w-1/2 flex flex-col rounded-2xl border border-input bg-background/90 overflow-hidden">
-        <Tabs
-          value={leftPanelView}
-          onValueChange={(value) => setLeftPanelView(value as LeftPanelView)}
-          className="flex-1 min-h-0 gap-0"
-        >
-          <div className="flex-shrink-0 border-b border-input p-4">
-            <TabsList className="h-8 rounded-lg bg-muted/80 p-0.5">
-              <TabsTrigger
-                value="chat"
-                className="h-full rounded-md px-2.5 text-xs font-semibold"
-              >
-                <MessageSquare className="size-3.5" />
-                Chat
-              </TabsTrigger>
-              <TabsTrigger
-                value="code"
-                className="h-full rounded-md px-2.5 text-xs font-semibold"
-              >
-                <Code2 className="size-3.5" />
-                Code
-              </TabsTrigger>
-            </TabsList>
+    <>
+      <div className="flex gap-4 h-full w-full p-4">
+        <div className="w-1/2 flex flex-col rounded-2xl border border-input bg-background/90 overflow-hidden">
+          <Tabs
+            value={leftPanelView}
+            onValueChange={(value) => setLeftPanelView(value as LeftPanelView)}
+            className="flex-1 min-h-0 gap-0"
+          >
+            <div className="flex-shrink-0 border-b border-input p-4">
+              <TabsList className="h-8 rounded-lg bg-muted/80 p-0.5">
+                <TabsTrigger
+                  value="chat"
+                  className="h-full rounded-md px-2.5 text-xs font-semibold"
+                >
+                  <MessageSquare className="size-3.5" />
+                  Chat
+                </TabsTrigger>
+                <TabsTrigger
+                  value="code"
+                  className="h-full rounded-md px-2.5 text-xs font-semibold"
+                >
+                  <Code2 className="size-3.5" />
+                  Code
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContents mode="layout" className="flex-1 min-h-0">
+              <TabsContent value="chat" className="h-full">
+                <div
+                  ref={chatScrollRef}
+                  className="h-full overflow-y-auto p-4 space-y-3"
+                >
+                  {conversation.map((message) => (
+                    <div
+                      key={message.id}
+                      className={cn(
+                        "relative max-w-[95%] rounded-3xl px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap shadow-sm",
+                        message.role === "user"
+                          ? "ml-auto bg-primary text-primary-foreground rounded-br-md"
+                          : "mr-auto bg-muted text-foreground rounded-bl-md"
+                      )}
+                    >
+                      {message.content}
+                    </div>
+                  ))}
+
+                  {isStreaming && (
+                    <div className="relative max-w-[95%] rounded-3xl rounded-bl-md px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap mr-auto bg-muted text-foreground shadow-sm">
+                      Generating website...
+                    </div>
+                  )}
+
+                  {requestError && (
+                    <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
+                      {requestError}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="code" className="h-full p-4">
+                {renderCodeOutput()}
+              </TabsContent>
+            </TabsContents>
+          </Tabs>
+          <div className="p-3 border-t border-input">
+            {renderInputSection()}
           </div>
+        </div>
 
-          <TabsContents mode="layout" className="flex-1 min-h-0">
-            <TabsContent value="chat" className="h-full">
-              <div
-                ref={chatScrollRef}
-                className="h-full overflow-y-auto p-4 space-y-3"
-              >
-                {conversation.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "relative max-w-[95%] rounded-3xl px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap shadow-sm",
-                      message.role === "user"
-                        ? "ml-auto bg-primary text-primary-foreground rounded-br-md"
-                        : "mr-auto bg-muted text-foreground rounded-bl-md"
-                    )}
+        <div className="w-1/2 rounded-2xl border border-input bg-background/90 overflow-hidden p-4">
+          <Tabs
+            value={workspaceView}
+            onValueChange={(value) => setWorkspaceView(value as WorkspaceView)}
+            className="h-full gap-4"
+          >
+            <div className="flex-shrink-0 border-b border-input pb-4 flex items-center justify-between gap-2">
+              <TabsList className="h-8 rounded-lg bg-muted/80 p-0.5">
+                <TabsTrigger
+                  value="preview"
+                  className="h-full rounded-md px-2.5 text-xs font-semibold"
+                >
+                  <Eye className="size-3.5" />
+                  Preview
+                </TabsTrigger>
+                <TabsTrigger
+                  value="code"
+                  className="h-full rounded-md px-2.5 text-xs font-semibold"
+                >
+                  <Code2 className="size-3.5" />
+                  Code
+                </TabsTrigger>
+              </TabsList>
+              {hasPreview && (
+                <div className="flex items-center gap-2">
+                  <span className="hidden lg:inline-flex rounded-md border border-input bg-muted/40 px-2 py-1 font-mono text-[10px] text-muted-foreground">
+                    {websiteId}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeployClick}
+                    disabled={isDeploying}
+                    className="h-8 rounded-md text-xs"
                   >
-                    {message.content}
-                  </div>
-                ))}
+                    {isDeploying ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Rocket className="size-3.5" />
+                    )}
+                    {isDeploying ? "Deploying..." : "Deploy"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenFullPreview}
+                    className="h-8 rounded-md text-xs"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    Full Preview
+                  </Button>
+                </div>
+              )}
+            </div>
 
-                {isStreaming && (
-                  <div className="relative max-w-[95%] rounded-3xl rounded-bl-md px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap mr-auto bg-muted text-foreground shadow-sm">
-                    Generating website...
-                  </div>
+            <TabsContents mode="layout" className="flex-1 min-h-0">
+              <TabsContent value="preview" className="h-full">
+                {previewSource ? (
+                  <iframe
+                    title="Website preview"
+                    srcDoc={previewFrameSrcDoc}
+                    className="h-full w-full rounded-xl border border-input bg-white"
+                    sandbox="allow-scripts allow-forms allow-modals allow-popups"
+                  />
+                ) : (
+                  renderGracefulState(
+                    isStreaming
+                      ? {
+                          title: "Preview not ready",
+                          description: "Generation is in progress. Switch to Code to track output.",
+                          pending: true,
+                        }
+                      : {
+                          title: "No preview yet",
+                          description: "Generate a website first, then preview will appear here.",
+                        }
+                  )
                 )}
+              </TabsContent>
 
-                {requestError && (
-                  <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
-                    {requestError}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="code" className="h-full p-4">
-              {renderCodeOutput()}
-            </TabsContent>
-          </TabsContents>
-        </Tabs>
-        <div className="p-3 border-t border-input">
-          {renderInputSection()}
+              <TabsContent value="code" className="h-full">
+                {renderCodeOutput()}
+              </TabsContent>
+            </TabsContents>
+          </Tabs>
         </div>
       </div>
 
-      <div className="w-1/2 rounded-2xl border border-input bg-background/90 overflow-hidden p-4">
-        <Tabs
-          value={workspaceView}
-          onValueChange={(value) => setWorkspaceView(value as WorkspaceView)}
-          className="h-full gap-4"
+      {isDeployDialogOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4"
+          onClick={handleCloseDeployDialog}
         >
-          <div className="flex-shrink-0 border-b border-input pb-4 flex items-center justify-between gap-2">
-            <TabsList className="h-8 rounded-lg bg-muted/80 p-0.5">
-              <TabsTrigger
-                value="preview"
-                className="h-full rounded-md px-2.5 text-xs font-semibold"
-              >
-                <Eye className="size-3.5" />
-                Preview
-              </TabsTrigger>
-              <TabsTrigger
-                value="code"
-                className="h-full rounded-md px-2.5 text-xs font-semibold"
-              >
-                <Code2 className="size-3.5" />
-                Code
-              </TabsTrigger>
-            </TabsList>
-            {hasPreview && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-lg rounded-2xl border border-input bg-background p-4 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">
+                  {deployError ? "Deploy failed" : "Website deployed"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {deployError ? "Unable to publish this version." : `Website ID: ${websiteId}`}
+                </p>
+              </div>
               <Button
-                variant="outline"
-                size="sm"
-                onClick={handleOpenFullPreview}
-                className="h-8 rounded-md text-xs"
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleCloseDeployDialog}
+                className="rounded-full"
               >
-                <ExternalLink className="size-3.5" />
-                Full Preview
+                <X className="size-4" />
               </Button>
+            </div>
+
+            {deployError ? (
+              <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {deployError}
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Share this URL with anyone to open your deployed website. It may take a few seconds to become globally available.
+                </p>
+                <div className="rounded-lg border border-input bg-muted/30 px-3 py-2 font-mono text-xs break-all">
+                  {deployUrl}
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyDeployLink}
+                    className="h-8 rounded-md text-xs"
+                  >
+                    {isDeployLinkCopied ? (
+                      <Check className="size-3.5" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                    {isDeployLinkCopied ? "Copied" : "Copy URL"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleOpenDeployedSite}
+                    className="h-8 rounded-md text-xs"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    Open Site
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
-
-          <TabsContents mode="layout" className="flex-1 min-h-0">
-            <TabsContent value="preview" className="h-full">
-              {previewSource ? (
-                <iframe
-                  title="Website preview"
-                  srcDoc={previewFrameSrcDoc}
-                  className="h-full w-full rounded-xl border border-input bg-white"
-                  sandbox="allow-scripts allow-forms allow-modals allow-popups"
-                />
-              ) : (
-                renderGracefulState(
-                  isStreaming
-                    ? {
-                        title: "Preview not ready",
-                        description: "Generation is in progress. Switch to Code to track output.",
-                        pending: true,
-                      }
-                    : {
-                        title: "No preview yet",
-                        description: "Generate a website first, then preview will appear here.",
-                      }
-                )
-              )}
-            </TabsContent>
-
-            <TabsContent value="code" className="h-full">
-              {renderCodeOutput()}
-            </TabsContent>
-          </TabsContents>
-        </Tabs>
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }
