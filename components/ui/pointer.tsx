@@ -27,7 +27,7 @@ export function Pointer({
   style,
   children,
   ...props
-}: HTMLMotionProps<"div">): JSX.Element {
+}: HTMLMotionProps<"div">) {
   const x = useMotionValue(0)
   const y = useMotionValue(0)
   const [isActive, setIsActive] = useState<boolean>(false)
