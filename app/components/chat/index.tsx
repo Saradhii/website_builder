@@ -481,7 +481,11 @@ function extractHtmlDocument(response: string): string | null {
 function injectIframePointerBridge(html: string): string {
   const pointerBridge = `
 <style id="magicui-iframe-pointer-style">
-  html, body, body * {
+  html[data-magicui-pointer="enabled"],
+  html[data-magicui-pointer="enabled"] body,
+  html[data-magicui-pointer="enabled"] body *,
+  html[data-magicui-pointer="enabled"] body *::before,
+  html[data-magicui-pointer="enabled"] body *::after {
     cursor: none !important;
   }
 </style>
@@ -489,12 +493,19 @@ function injectIframePointerBridge(html: string): string {
   (function () {
     var MOVE = "magicui:iframe-pointer-move";
     var LEAVE = "magicui:iframe-pointer-leave";
+    var root = document.documentElement;
+    root.setAttribute("data-magicui-pointer", "enabled");
+
     var post = function (payload) {
-      window.parent.postMessage(payload, "*");
+      try {
+        window.parent.postMessage(payload, "*");
+      } catch (_error) {}
     };
+    var moveEvent = window.PointerEvent ? "pointermove" : "mousemove";
+    var leaveEvent = window.PointerEvent ? "pointerleave" : "mouseleave";
 
     window.addEventListener(
-      "pointermove",
+      moveEvent,
       function (event) {
         post({ type: MOVE, x: event.clientX, y: event.clientY });
       },
@@ -502,7 +513,7 @@ function injectIframePointerBridge(html: string): string {
     );
 
     window.addEventListener(
-      "pointerleave",
+      leaveEvent,
       function () {
         post({ type: LEAVE });
       },
@@ -601,7 +612,7 @@ export function ChatInterface() {
   const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false);
   const [isDeployLinkCopied, setIsDeployLinkCopied] = useState(false);
   const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>("chat");
-  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("preview");
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("code");
   const popoverId = useId();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -791,6 +802,7 @@ export function ChatInterface() {
       setRequestError(null);
       setIsStreaming(true);
       setStreamingText("");
+      setWorkspaceView("code");
       setConversation((prev) => [
         ...prev,
         createConversationMessage("user", trimmedPrompt),
@@ -825,6 +837,7 @@ export function ChatInterface() {
         const html = extractHtmlDocument(assistantOutput);
         if (html) {
           setPreviewHtml(html);
+          setWorkspaceView("preview");
           setConversation((prev) => [
             ...prev,
             createConversationMessage(
@@ -893,12 +906,8 @@ export function ChatInterface() {
   const canSubmit = Boolean(inputValue.trim()) && Boolean(selectedModel) && !isStreaming;
   const hasPreview = Boolean(previewHtml);
   const hasStreamingText = Boolean(streamingText.trim());
-  const streamedPreviewHtml = extractHtmlDocument(streamingText) || "";
-  const previewSource = isStreaming
-    ? streamedPreviewHtml || previewHtml
-    : previewHtml;
-  const previewFrameSrcDoc = previewSource
-    ? injectIframePointerBridge(previewSource)
+  const previewFrameSrcDoc = hasPreview
+    ? injectIframePointerBridge(previewHtml)
     : "";
   const renderGracefulState = ({
     title,
@@ -1461,26 +1470,24 @@ export function ChatInterface() {
 
             <TabsContents mode="layout" className="flex-1 min-h-0">
               <TabsContent value="preview" className="h-full">
-                {previewSource ? (
+                {isStreaming ? (
+                  renderGracefulState({
+                    title: "Preview will appear here",
+                    description: "Generation is in progress. You can follow code updates while we finish.",
+                    pending: true,
+                  })
+                ) : hasPreview ? (
                   <iframe
                     title="Website preview"
                     srcDoc={previewFrameSrcDoc}
-                    className="h-full w-full rounded-xl border border-input bg-white"
+                    className="h-full w-full rounded-xl border border-input bg-white cursor-none"
                     sandbox="allow-scripts allow-forms allow-modals allow-popups"
                   />
                 ) : (
-                  renderGracefulState(
-                    isStreaming
-                      ? {
-                          title: "Preview not ready",
-                          description: "Generation is in progress. Switch to Code to track output.",
-                          pending: true,
-                        }
-                      : {
-                          title: "No preview yet",
-                          description: "Generate a website first, then preview will appear here.",
-                        }
-                  )
+                  renderGracefulState({
+                    title: "No preview yet",
+                    description: "Generate a website first, then preview will appear here.",
+                  })
                 )}
               </TabsContent>
 
@@ -1494,7 +1501,7 @@ export function ChatInterface() {
 
       {isDeployDialogOpen && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-background/75 backdrop-blur-sm p-4"
           onClick={handleCloseDeployDialog}
         >
           <div

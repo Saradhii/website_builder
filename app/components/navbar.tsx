@@ -18,7 +18,7 @@ export function Navbar() {
   return (
     <header className="relative z-50">
       <div className="max-w-3xl mx-auto px-4 xl:px-0 py-3">
-        <div className="bg-transparent flex items-center justify-between gap-x-4 rounded-3xl border border-input/80 py-2.5 pl-5 pr-2.5">
+        <div className="bg-background/85 backdrop-blur-md flex items-center justify-between gap-x-4 rounded-3xl border border-input/80 py-2.5 pl-5 pr-2.5">
           <div className="flex items-center gap-x-10">
             <Link href="/" title="Home" className="flex items-center gap-2">
               <Bailian.Color className="w-5 h-5 sm:w-7 sm:h-7" />
