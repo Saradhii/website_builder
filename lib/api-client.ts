@@ -28,32 +28,165 @@ export type StreamCallbacks = {
   onDone?: () => void;
 };
 
-const DEFAULT_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8788";
+type ApiErrorDetails = {
+  status: number;
+  code?: string;
+  provider?: string;
+  attemptedProviders?: string[];
+};
 
-function buildUrl(path: string) {
-  const base = DEFAULT_BASE_URL.replace(/\/$/, "");
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${normalized}`;
+type ApiErrorResponse = ApiErrorDetails & {
+  message: string;
+};
+
+const PRIMARY_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:8788";
+
+const FALLBACK_BASE_URLS = (process.env.NEXT_PUBLIC_API_FALLBACK_BASE_URLS ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  provider?: string;
+  attemptedProviders?: string[];
+
+  constructor(message: string, details: ApiErrorDetails) {
+    super(message);
+    this.name = "ApiError";
+    this.status = details.status;
+    this.code = details.code;
+    this.provider = details.provider;
+    this.attemptedProviders = details.attemptedProviders;
+  }
 }
 
-async function readErrorMessage(res: Response) {
+function normalizeBaseUrl(baseUrl: string) {
+  return baseUrl.replace(/\/+$/, "");
+}
+
+function buildUrl(path: string, baseUrl: string) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (!baseUrl) return normalizedPath;
+  return `${baseUrl}${normalizedPath}`;
+}
+
+function getBaseCandidates() {
+  const candidates = [PRIMARY_BASE_URL, ...FALLBACK_BASE_URLS]
+    .map((baseUrl) => normalizeBaseUrl(baseUrl))
+    .filter(Boolean);
+
+  return candidates.filter((candidate, index) => candidates.indexOf(candidate) === index);
+}
+
+function shouldTryNextBase(status: number) {
+  if (status === 408 || status === 409 || status === 425 || status === 429) {
+    return true;
+  }
+  return status >= 500 && status <= 599;
+}
+
+async function readErrorResponse(res: Response): Promise<ApiErrorResponse> {
   try {
-    const data = (await res.json()) as { error?: string };
-    if (data && typeof data.error === "string") {
-      return data.error;
-    }
+    const payload = (await res.json()) as {
+      error?: string;
+      message?: string;
+      status?: number;
+      code?: string;
+      provider?: string;
+      attemptedProviders?: string[];
+    };
+
+    const message =
+      (typeof payload.error === "string" && payload.error) ||
+      (typeof payload.message === "string" && payload.message) ||
+      `${res.status} ${res.statusText}`.trim();
+
+    return {
+      message,
+      status: typeof payload.status === "number" ? payload.status : res.status,
+      code: typeof payload.code === "string" ? payload.code : undefined,
+      provider: typeof payload.provider === "string" ? payload.provider : undefined,
+      attemptedProviders: Array.isArray(payload.attemptedProviders)
+        ? payload.attemptedProviders.filter(
+            (provider): provider is string => typeof provider === "string"
+          )
+        : undefined,
+    };
   } catch {
     // Ignore JSON parse errors and fall back to status text.
   }
-  return `${res.status} ${res.statusText}`.trim();
+
+  const fallbackMessage = `${res.status} ${res.statusText}`.trim();
+  return {
+    message: fallbackMessage,
+    status: res.status,
+  };
+}
+
+function ensureApiError(error: unknown, fallbackStatus = 500): ApiError {
+  if (error instanceof ApiError) return error;
+  if (error instanceof Error) {
+    return new ApiError(error.message, { status: fallbackStatus });
+  }
+  return new ApiError("Something went wrong while contacting the API.", {
+    status: fallbackStatus,
+  });
+}
+
+async function requestWithBaseFallback(path: string, init: RequestInit) {
+  const baseCandidates = getBaseCandidates();
+  let lastError: ApiError | null = null;
+
+  for (const [index, base] of baseCandidates.entries()) {
+    const isLast = index === baseCandidates.length - 1;
+    const url = buildUrl(path, base);
+
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw error;
+      }
+
+      lastError = new ApiError("Unable to reach the API service.", {
+        status: 503,
+        code: "NETWORK_ERROR",
+      });
+
+      if (!isLast) continue;
+      throw lastError;
+    }
+
+    if (res.ok) {
+      return res;
+    }
+
+    const details = await readErrorResponse(res);
+    lastError = new ApiError(details.message, details);
+
+    if (!isLast && shouldTryNextBase(details.status)) {
+      continue;
+    }
+
+    throw lastError;
+  }
+
+  throw (
+    lastError ??
+    new ApiError("Unable to reach the API service.", {
+      status: 503,
+      code: "NETWORK_ERROR",
+    })
+  );
 }
 
 export async function fetchModels(signal?: AbortSignal) {
-  const res = await fetch(buildUrl("/api/ai/models"), { signal });
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res));
-  }
+  const res = await requestWithBaseFallback("/api/ai/models", { signal });
+
   const data = (await res.json()) as ModelsResponse;
   if (!data || !Array.isArray(data.models)) {
     throw new Error("Invalid models response.");
@@ -62,16 +195,12 @@ export async function fetchModels(signal?: AbortSignal) {
 }
 
 export async function createChat(request: ChatRequest, signal?: AbortSignal) {
-  const res = await fetch(buildUrl("/api/ai/chat"), {
+  const res = await requestWithBaseFallback("/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...request, stream: false }),
     signal,
   });
-
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res));
-  }
 
   return res.json();
 }
@@ -113,7 +242,13 @@ function extractSseEvents(buffer: string): SseParseResult {
 function extractToken(payload: unknown) {
   if (!payload || typeof payload !== "object") return null;
 
-  const choice = (payload as { choices?: Array<Record<string, any>> }).choices?.[0];
+  type ChoicePayload = {
+    delta?: { content?: unknown; text?: unknown };
+    message?: { content?: unknown };
+    text?: unknown;
+  };
+
+  const choice = (payload as { choices?: ChoicePayload[] }).choices?.[0];
   if (!choice) return null;
 
   if (typeof choice.delta?.content === "string") return choice.delta.content;
@@ -129,17 +264,22 @@ export async function streamChat(
   callbacks: StreamCallbacks,
   signal?: AbortSignal
 ) {
-  const res = await fetch(buildUrl("/api/ai/chat"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...request, stream: true }),
-    signal,
-  });
+  let res: Response;
+  try {
+    res = await requestWithBaseFallback("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...request, stream: true }),
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
 
-  if (!res.ok) {
-    const message = await readErrorMessage(res);
-    callbacks.onError?.(message);
-    throw new Error(message);
+    const apiError = ensureApiError(error, 500);
+    callbacks.onError?.(apiError.message);
+    throw apiError;
   }
 
   const reader = res.body?.getReader();

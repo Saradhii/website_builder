@@ -27,6 +27,7 @@ import {
 } from "@/lib/api-client";
 import { deployWebsite } from "@/lib/deploy-client";
 import {
+  AlertTriangle,
   ArrowUp,
   Check,
   ChevronDown,
@@ -546,6 +547,46 @@ function buildWebsitePrompt(userPrompt: string, currentHtml?: string) {
   return `${WEBSITE_SYSTEM_INSTRUCTIONS}\n\nUpdate the existing website based on the user request.\n\nCurrent HTML:\n\`\`\`html\n${currentHtml}\n\`\`\`\n\nUser request:\n${userPrompt}`;
 }
 
+function formatRequestError(message: string) {
+  const trimmed = message.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (
+    trimmed === "429" ||
+    lower.includes("429") ||
+    lower.includes("rate limit") ||
+    lower.includes("too many requests") ||
+    lower.includes("rate-limited")
+  ) {
+    return {
+      title: "Traffic is high right now",
+      description:
+        "The model provider is temporarily rate-limited. We already tried available fallbacks, so please retry in 20-30 seconds.",
+    };
+  }
+
+  if (lower.includes("temporarily unavailable") || lower.includes("provider")) {
+    return {
+      title: "Model service is temporarily unavailable",
+      description:
+        "Please retry shortly. If this keeps happening, switch models and try again.",
+    };
+  }
+
+  if (lower.includes("network") || lower.includes("unable to reach")) {
+    return {
+      title: "Connection issue",
+      description:
+        "The app could not reach the AI service. Check your connection and try again.",
+    };
+  }
+
+  return {
+    title: "Request failed",
+    description: trimmed || "Something went wrong while generating this response.",
+  };
+}
+
 // Model Icon Component using inline SVGs from Lobehub
 function ModelIcon({ provider, className }: { provider: string; className?: string }) {
   switch (provider) {
@@ -968,6 +1009,7 @@ export function ChatInterface() {
   };
   const hasWorkspace =
     hasPreview || conversation.length > 0 || isStreaming || Boolean(requestError);
+  const requestErrorView = requestError ? formatRequestError(requestError) : null;
   const isInitialState =
     isMounted &&
     !isMockMode &&
@@ -1395,9 +1437,15 @@ export function ChatInterface() {
                     </div>
                   )}
 
-                  {requestError && (
-                    <div className="max-w-[95%] rounded-xl px-3 py-2 text-sm mr-auto bg-destructive/10 text-destructive border border-destructive/30">
-                      {requestError}
+                  {requestErrorView && (
+                    <div className="mr-auto max-w-[95%] rounded-2xl border border-destructive/25 bg-destructive/5 px-3.5 py-3 shadow-sm">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                        <span>{requestErrorView.title}</span>
+                      </div>
+                      <p className="mt-1 pl-6 text-xs leading-5 text-muted-foreground">
+                        {requestErrorView.description}
+                      </p>
                     </div>
                   )}
                 </div>
