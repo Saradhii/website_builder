@@ -631,7 +631,6 @@ export function ChatInterface() {
   } = useBuilderWorkspace();
 
   const [isMockReady, setIsMockReady] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [modelsStatus, setModelsStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -662,10 +661,6 @@ export function ChatInterface() {
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   useEffect(() => {
     if (isMockMode && !isMockReady) {
@@ -1011,14 +1006,12 @@ export function ChatInterface() {
     hasPreview || conversation.length > 0 || isStreaming || Boolean(requestError);
   const requestErrorView = requestError ? formatRequestError(requestError) : null;
   const isInitialState =
-    isMounted &&
     !isMockMode &&
     conversation.length === 0 &&
     !isStreaming &&
     !requestError &&
     !hasPreview;
   const showStarterSuggestions =
-    isMounted &&
     !isMockMode &&
     !hasPreview &&
     conversation.length === 0 &&
