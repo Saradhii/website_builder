@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, useId } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,10 +14,14 @@ import {
   TabsTrigger,
 } from "@/components/animate-ui/components/radix/tabs";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogTitle,
+} from "@/components/animate-ui/components/headless/dialog";
+import { Checkbox } from "@/components/animate-ui/components/headless/checkbox";
 import { useBuilderWorkspace } from "@/app/components/builder-workspace/context";
 import { cn } from "@/lib/utils";
 import {
@@ -364,7 +368,8 @@ export function ChatInterface() {
   const [modelsStatus, setModelsStatus] = useState<"idle" | "loading" | "error">("idle");
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState("");
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
+  const [pendingModelSelection, setPendingModelSelection] = useState("");
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
@@ -380,7 +385,6 @@ export function ChatInterface() {
   const [isDeployLinkCopied, setIsDeployLinkCopied] = useState(false);
   const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>("chat");
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("code");
-  const popoverId = useId();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -451,6 +455,12 @@ export function ChatInterface() {
       controller.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (isModelDialogOpen) {
+      setPendingModelSelection(selectedModel);
+    }
+  }, [isModelDialogOpen, selectedModel]);
 
   const selectedModelData = models.find((m: ModelInfo) => m.id === selectedModel);
 
@@ -631,6 +641,12 @@ export function ChatInterface() {
     setInputValue("");
     void sendPrompt(prompt);
   }, [inputValue, sendPrompt]);
+
+  const handleApplyModelSelection = useCallback(() => {
+    if (!pendingModelSelection) return;
+    setSelectedModel(pendingModelSelection);
+    setIsModelDialogOpen(false);
+  }, [pendingModelSelection]);
 
   const handleSuggestionClick = useCallback(
     (suggestion: Suggestion) => {
@@ -950,67 +966,114 @@ export function ChatInterface() {
               <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
 
-            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  id={popoverId}
-                  variant="outline"
-                  className="h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent"
-                >
-                  {selectedModelData && (
-                    <ModelIcon
-                      provider={selectedModelData.provider}
-                      className="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                    />
-                  )}
-                  <span className="text-xs sm:text-sm truncate max-w-[110px] sm:max-w-none">
-                    {selectedModelData?.name ??
-                      (modelsStatus === "loading"
-                        ? "Loading models..."
-                        : "Select a model")}
-                  </span>
-                  <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-52 sm:w-56 p-2" align="start">
-                <div className="flex flex-col gap-1">
+            <Button
+              variant="outline"
+              onClick={() => setIsModelDialogOpen(true)}
+              className="h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent"
+            >
+              {selectedModelData && (
+                <ModelIcon
+                  provider={selectedModelData.provider}
+                  className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                />
+              )}
+              <span className="text-xs sm:text-sm truncate max-w-[110px] sm:max-w-none">
+                {selectedModelData?.name ??
+                  (modelsStatus === "loading"
+                    ? "Loading models..."
+                    : "Select a model")}
+              </span>
+              <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
+            </Button>
+            <Dialog open={isModelDialogOpen} onClose={setIsModelDialogOpen}>
+              <DialogPanel from="bottom" className="p-0 sm:max-w-md">
+                <DialogHeader className="px-4 pt-4 pb-2">
+                  <DialogTitle className="text-sm">Select model</DialogTitle>
+                  <DialogDescription className="text-xs">
+                    Choose one model for website generation.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="max-h-[60vh] overflow-y-auto p-3">
                   {modelsStatus === "loading" && (
-                    <span className="px-2 py-1 text-xs text-muted-foreground">
+                    <span className="block px-2 py-1 text-xs text-muted-foreground">
                       Loading models...
                     </span>
                   )}
                   {modelsStatus === "error" && (
-                    <span className="px-2 py-1 text-xs text-destructive">
+                    <span className="block px-2 py-1 text-xs text-destructive">
                       {modelsError ?? "Failed to load models."}
                     </span>
                   )}
                   {modelsStatus !== "loading" &&
                     models.length === 0 &&
                     modelsStatus !== "error" && (
-                      <span className="px-2 py-1 text-xs text-muted-foreground">
+                      <span className="block px-2 py-1 text-xs text-muted-foreground">
                         No models available.
                       </span>
                     )}
-                  {models.map((model: ModelInfo) => (
-                    <Button
-                      key={model.id}
-                      variant="ghost"
-                      className={cn(
-                        "justify-start gap-2 h-8 sm:h-9",
-                        selectedModel === model.id && "bg-accent"
-                      )}
-                      onClick={() => {
-                        setSelectedModel(model.id);
-                        setIsPopoverOpen(false);
-                      }}
-                    >
-                      <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                      <span className="text-xs sm:text-sm">{model.name}</span>
-                    </Button>
-                  ))}
+                  <div className="flex flex-col gap-1.5">
+                    {models.map((model: ModelInfo) => {
+                      const isSelected = pendingModelSelection === model.id;
+                      return (
+                        <div
+                          key={model.id}
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={isSelected}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
+                            isSelected
+                              ? "border-primary/30 bg-accent"
+                              : "border-transparent hover:bg-accent/60"
+                          )}
+                          onClick={() => setPendingModelSelection(model.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setPendingModelSelection(model.id);
+                            }
+                          }}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={(checked) => {
+                              if (Boolean(checked)) {
+                                setPendingModelSelection(model.id);
+                              }
+                            }}
+                            variant="accent"
+                            size="sm"
+                            className="pointer-events-none"
+                            tabIndex={-1}
+                            aria-hidden="true"
+                          />
+                          <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <span className="text-xs sm:text-sm">{model.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </PopoverContent>
-            </Popover>
+                <DialogFooter className="border-t border-input px-3 py-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 rounded-md text-xs"
+                    onClick={() => setIsModelDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 rounded-md text-xs"
+                    onClick={handleApplyModelSelection}
+                    disabled={!pendingModelSelection}
+                  >
+                    Apply Selection
+                  </Button>
+                </DialogFooter>
+              </DialogPanel>
+            </Dialog>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
