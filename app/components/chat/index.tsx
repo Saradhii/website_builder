@@ -61,7 +61,6 @@ interface Suggestion {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   prompt: string;
-  templateHtml?: string;
 }
 
 interface ConversationMessage {
@@ -96,276 +95,6 @@ const MOCK_CONVERSATION: ConversationMessage[] = [
   },
 ];
 
-const PORTFOLIO_TEMPLATE_HTML = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alex Carter - Portfolio</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --surface: #111827;
-      --card: #1f2937;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --accent: #22d3ee;
-      --accent-2: #38bdf8;
-      --border: #334155;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: radial-gradient(circle at 20% 0%, #1e293b, var(--bg) 45%);
-      color: var(--text);
-      line-height: 1.5;
-    }
-
-    .container {
-      width: min(1100px, 92%);
-      margin: 0 auto;
-    }
-
-    header {
-      padding: 1.25rem 0;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-      position: sticky;
-      top: 0;
-      backdrop-filter: blur(8px);
-      background: rgba(15, 23, 42, 0.7);
-    }
-
-    .nav {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .brand {
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 1rem;
-      font-size: 0.95rem;
-    }
-
-    .nav-links a {
-      color: var(--muted);
-      text-decoration: none;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 2rem;
-      padding: 5rem 0 3rem;
-      align-items: center;
-    }
-
-    .hero h1 {
-      margin: 0;
-      font-size: clamp(2rem, 4vw, 3.3rem);
-      line-height: 1.1;
-    }
-
-    .hero p {
-      color: var(--muted);
-      margin-top: 1rem;
-      font-size: 1.05rem;
-    }
-
-    .cta-row {
-      margin-top: 1.5rem;
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      border: 1px solid transparent;
-      padding: 0.7rem 1rem;
-      border-radius: 999px;
-      font-weight: 600;
-      text-decoration: none;
-      display: inline-block;
-    }
-
-    .btn.primary {
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      color: #00131a;
-    }
-
-    .btn.ghost {
-      border-color: var(--border);
-      color: var(--text);
-    }
-
-    .hero-card {
-      border: 1px solid var(--border);
-      border-radius: 1rem;
-      padding: 1.25rem;
-      background: linear-gradient(180deg, rgba(56, 189, 248, 0.08), rgba(15, 23, 42, 0.4));
-    }
-
-    section {
-      padding: 1.8rem 0;
-    }
-
-    .section-title {
-      margin: 0 0 1rem;
-      font-size: 1.4rem;
-    }
-
-    .projects {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1rem;
-    }
-
-    .project {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 0.85rem;
-      padding: 1rem;
-    }
-
-    .project h3 {
-      margin: 0;
-      font-size: 1rem;
-    }
-
-    .project p {
-      margin: 0.65rem 0 0;
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-
-    .skills {
-      display: flex;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-    }
-
-    .skill {
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 0.35rem 0.8rem;
-      color: var(--muted);
-      font-size: 0.86rem;
-    }
-
-    .contact {
-      border: 1px solid var(--border);
-      border-radius: 0.9rem;
-      padding: 1rem;
-      background: rgba(17, 24, 39, 0.7);
-    }
-
-    .contact p {
-      margin: 0;
-      color: var(--muted);
-    }
-
-    footer {
-      padding: 2rem 0 3rem;
-      color: var(--muted);
-      font-size: 0.9rem;
-      text-align: center;
-    }
-
-    @media (max-width: 920px) {
-      .hero {
-        grid-template-columns: 1fr;
-      }
-
-      .projects {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
-    @media (max-width: 640px) {
-      .projects {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <div class="container nav">
-      <div class="brand">Alex Carter</div>
-      <nav class="nav-links">
-        <a href="#about">About</a>
-        <a href="#projects">Projects</a>
-        <a href="#contact">Contact</a>
-      </nav>
-    </div>
-  </header>
-
-  <main class="container">
-    <section class="hero" id="about">
-      <div>
-        <h1>Frontend Engineer Building Fast, Elegant Web Experiences</h1>
-        <p>
-          I design and build modern digital products with a strong focus on usability,
-          accessibility, and performance.
-        </p>
-        <div class="cta-row">
-          <a class="btn primary" href="#projects">View Projects</a>
-          <a class="btn ghost" href="#contact">Contact Me</a>
-        </div>
-      </div>
-      <div class="hero-card">
-        <strong>Currently:</strong>
-        <p>Creating interactive web apps and AI-assisted product prototypes for startups.</p>
-        <div class="skills">
-          <span class="skill">React</span>
-          <span class="skill">TypeScript</span>
-          <span class="skill">Next.js</span>
-          <span class="skill">UI Engineering</span>
-        </div>
-      </div>
-    </section>
-
-    <section id="projects">
-      <h2 class="section-title">Featured Projects</h2>
-      <div class="projects">
-        <article class="project">
-          <h3>Website Builder AI</h3>
-          <p>Prompt-based website generation tool with live preview and instant editing loop.</p>
-        </article>
-        <article class="project">
-          <h3>Analytics Dashboard</h3>
-          <p>Data-heavy admin dashboard with interactive charts and role-based access.</p>
-        </article>
-        <article class="project">
-          <h3>Design System Kit</h3>
-          <p>Reusable component library with tokens, accessibility checks, and docs site.</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="contact" class="contact">
-      <h2 class="section-title">Let's Work Together</h2>
-      <p>Email: hello@alexcarter.dev</p>
-      <p>LinkedIn: linkedin.com/in/alexcarter</p>
-    </section>
-  </main>
-
-  <footer>
-    © 2026 Alex Carter. Built with HTML and CSS.
-  </footer>
-</body>
-</html>`;
-
 const SUGGESTIONS: Suggestion[] = [
   {
     id: "invitation",
@@ -383,11 +112,10 @@ const SUGGESTIONS: Suggestion[] = [
   },
   {
     id: "portfolio",
-    label: "Portfolio Template",
+    label: "Portfolio",
     icon: Briefcase,
-    templateHtml: PORTFOLIO_TEMPLATE_HTML,
     prompt:
-      "Use the starter portfolio template and upgrade it with a stronger hero section, better project cards, and improved typography while keeping it single-file HTML and CSS.",
+      "Create a modern portfolio website for a software developer with strong hero copy, polished project cards, and clear contact details.",
   },
   {
     id: "resume",
@@ -640,7 +368,6 @@ export function ChatInterface() {
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
-  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -665,13 +392,10 @@ export function ChatInterface() {
   useEffect(() => {
     if (isMockMode && !isMockReady) {
       setIsMockReady(true);
-      setPreviewHtml(PORTFOLIO_TEMPLATE_HTML);
-      setActiveTemplate("Portfolio");
       setConversation(MOCK_CONVERSATION);
       setHasWorkspace(true);
-      setHasPreview(true);
     }
-  }, [isMockMode, isMockReady, setHasWorkspace, setHasPreview]);
+  }, [isMockMode, isMockReady, setHasWorkspace]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -820,7 +544,7 @@ export function ChatInterface() {
   };
 
   const sendPrompt = useCallback(
-    async (prompt: string, starterHtml?: string, templateName?: string) => {
+    async (prompt: string) => {
       const trimmedPrompt = prompt.trim();
       if (!trimmedPrompt || !selectedModel || isStreaming) return;
 
@@ -828,12 +552,6 @@ export function ChatInterface() {
       const controller = new AbortController();
       abortControllerRef.current = controller;
       const requestId = ++requestIdRef.current;
-
-      const currentHtml = starterHtml ?? previewHtml;
-      if (starterHtml) {
-        setPreviewHtml(starterHtml);
-        setActiveTemplate(templateName ?? "Template");
-      }
 
       setRequestError(null);
       setIsStreaming(true);
@@ -850,7 +568,7 @@ export function ChatInterface() {
         await streamChat(
           {
             model: selectedModel,
-            input: buildWebsitePrompt(trimmedPrompt, currentHtml),
+            input: buildWebsitePrompt(trimmedPrompt, previewHtml),
             stream: true,
           },
           {
@@ -917,16 +635,10 @@ export function ChatInterface() {
   const handleSuggestionClick = useCallback(
     (suggestion: Suggestion) => {
       if (isStreaming) return;
-
-      if (suggestion.templateHtml) {
-        void sendPrompt(suggestion.prompt, suggestion.templateHtml, suggestion.label);
-        return;
-      }
-
       setInputValue(suggestion.prompt);
       textareaRef.current?.focus();
     },
-    [isStreaming, sendPrompt]
+    [isStreaming]
   );
 
   const handleKeyDown = useCallback(
@@ -1026,7 +738,7 @@ export function ChatInterface() {
     setDeployError(null);
     setIsDeployLinkCopied(false);
 
-    const websiteName = (activeTemplate ?? "website").trim() || "website";
+    const websiteName = "website";
 
     void deployWebsite({
       id: websiteId,
@@ -1047,7 +759,7 @@ export function ChatInterface() {
       .finally(() => {
         setIsDeploying(false);
       });
-  }, [activeTemplate, isDeploying, previewHtml, websiteId]);
+  }, [isDeploying, previewHtml, websiteId]);
 
   const handleCopyDeployLink = useCallback(() => {
     if (!deployUrl) return;
