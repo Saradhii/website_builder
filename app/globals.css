@@ -120,11 +120,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-html.magicui-pointer-enabled,
-html.magicui-pointer-enabled body,
-html.magicui-pointer-enabled body *,
-html.magicui-pointer-enabled body *::before,
-html.magicui-pointer-enabled body *::after {
-  cursor: none !important;
-}

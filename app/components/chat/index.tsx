@@ -15,13 +15,12 @@ import {
 } from "@/components/animate-ui/components/radix/tabs";
 import {
   Dialog,
+  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogPanel,
   DialogTitle,
-} from "@/components/animate-ui/components/headless/dialog";
-import { Checkbox } from "@/components/animate-ui/components/headless/checkbox";
+} from "@/components/ui/dialog";
 import { useBuilderWorkspace } from "@/app/components/builder-workspace/context";
 import { cn } from "@/lib/utils";
 import {
@@ -209,66 +208,6 @@ function extractHtmlDocument(response: string): string | null {
   }
 
   return null;
-}
-
-function injectIframePointerBridge(html: string): string {
-  const pointerBridge = `
-<style id="magicui-iframe-pointer-style">
-  html[data-magicui-pointer="enabled"],
-  html[data-magicui-pointer="enabled"] body,
-  html[data-magicui-pointer="enabled"] body *,
-  html[data-magicui-pointer="enabled"] body *::before,
-  html[data-magicui-pointer="enabled"] body *::after {
-    cursor: none !important;
-  }
-</style>
-<script>
-  (function () {
-    var MOVE = "magicui:iframe-pointer-move";
-    var LEAVE = "magicui:iframe-pointer-leave";
-    var root = document.documentElement;
-    root.setAttribute("data-magicui-pointer", "enabled");
-
-    var post = function (payload) {
-      try {
-        window.parent.postMessage(payload, "*");
-      } catch (_error) {}
-    };
-    var moveEvent = window.PointerEvent ? "pointermove" : "mousemove";
-    var leaveEvent = window.PointerEvent ? "pointerleave" : "mouseleave";
-
-    window.addEventListener(
-      moveEvent,
-      function (event) {
-        post({ type: MOVE, x: event.clientX, y: event.clientY });
-      },
-      { passive: true }
-    );
-
-    window.addEventListener(
-      leaveEvent,
-      function () {
-        post({ type: LEAVE });
-      },
-      { passive: true }
-    );
-
-    window.addEventListener("blur", function () {
-      post({ type: LEAVE });
-    });
-  })();
-</script>
-`;
-
-  if (/<\/body>/i.test(html)) {
-    return html.replace(/<\/body>/i, `${pointerBridge}</body>`);
-  }
-
-  if (/<\/html>/i.test(html)) {
-    return html.replace(/<\/html>/i, `${pointerBridge}</html>`);
-  }
-
-  return `${html}${pointerBridge}`;
 }
 
 function buildWebsitePrompt(userPrompt: string, currentHtml?: string) {
@@ -670,9 +609,7 @@ export function ChatInterface() {
   const canSubmit = Boolean(inputValue.trim()) && Boolean(selectedModel) && !isStreaming;
   const hasPreview = Boolean(previewHtml);
   const hasStreamingText = Boolean(streamingText.trim());
-  const previewFrameSrcDoc = hasPreview
-    ? injectIframePointerBridge(previewHtml)
-    : "";
+  const previewFrameSrcDoc = hasPreview ? previewHtml : "";
   const renderGracefulState = ({
     title,
     description,
@@ -985,8 +922,8 @@ export function ChatInterface() {
               </span>
               <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
             </Button>
-            <Dialog open={isModelDialogOpen} onClose={setIsModelDialogOpen}>
-              <DialogPanel from="bottom" className="p-0 sm:max-w-md">
+            <Dialog open={isModelDialogOpen} onOpenChange={setIsModelDialogOpen}>
+              <DialogContent className="p-0 sm:max-w-md">
                 <DialogHeader className="px-4 pt-4 pb-2">
                   <DialogTitle className="text-sm">Select model</DialogTitle>
                   <DialogDescription className="text-xs">
@@ -1034,19 +971,17 @@ export function ChatInterface() {
                             }
                           }}
                         >
-                          <Checkbox
-                            checked={isSelected}
-                            onChange={(checked) => {
-                              if (Boolean(checked)) {
-                                setPendingModelSelection(model.id);
-                              }
-                            }}
-                            variant="accent"
-                            size="sm"
-                            className="pointer-events-none"
-                            tabIndex={-1}
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center rounded-full border",
+                              isSelected
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-input"
+                            )}
                             aria-hidden="true"
-                          />
+                          >
+                            {isSelected && <Check className="size-2.5" />}
+                          </span>
                           <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           <span className="text-xs sm:text-sm">{model.name}</span>
                         </div>
@@ -1072,7 +1007,7 @@ export function ChatInterface() {
                     Apply Selection
                   </Button>
                 </DialogFooter>
-              </DialogPanel>
+              </DialogContent>
             </Dialog>
           </div>
 
@@ -1296,7 +1231,7 @@ export function ChatInterface() {
                   <iframe
                     title="Website preview"
                     srcDoc={previewFrameSrcDoc}
-                    className="h-full w-full rounded-xl border border-input bg-white cursor-none"
+                    className="h-full w-full rounded-xl border border-input bg-white"
                     sandbox="allow-scripts allow-forms allow-modals allow-popups"
                   />
                 ) : (
@@ -1315,76 +1250,56 @@ export function ChatInterface() {
         </div>
       </div>
 
-      {isDeployDialogOpen && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-background/75 backdrop-blur-sm p-4"
-          onClick={handleCloseDeployDialog}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="w-full max-w-lg rounded-2xl border border-input bg-background p-4 shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold">
-                  {deployError ? "Deploy failed" : "Website deployed"}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {deployError ? "Unable to publish this version." : `Website ID: ${websiteId}`}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleCloseDeployDialog}
-                className="rounded-full"
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
+      <Dialog open={isDeployDialogOpen} onOpenChange={(open) => { if (!open) handleCloseDeployDialog(); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-sm">
+              {deployError ? "Deploy failed" : "Website deployed"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {deployError ? "Unable to publish this version." : `Website ID: ${websiteId}`}
+            </DialogDescription>
+          </DialogHeader>
 
-            {deployError ? (
-              <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {deployError}
+          {deployError ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {deployError}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Share this URL with anyone to open your deployed website. It may take a few seconds to become globally available.
+              </p>
+              <div className="rounded-lg border border-input bg-muted/30 px-3 py-2 font-mono text-xs break-all">
+                {deployUrl}
               </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Share this URL with anyone to open your deployed website. It may take a few seconds to become globally available.
-                </p>
-                <div className="rounded-lg border border-input bg-muted/30 px-3 py-2 font-mono text-xs break-all">
-                  {deployUrl}
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyDeployLink}
-                    className="h-8 rounded-md text-xs"
-                  >
-                    {isDeployLinkCopied ? (
-                      <Check className="size-3.5" />
-                    ) : (
-                      <Copy className="size-3.5" />
-                    )}
-                    {isDeployLinkCopied ? "Copied" : "Copy URL"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleOpenDeployedSite}
-                    className="h-8 rounded-md text-xs"
-                  >
-                    <ExternalLink className="size-3.5" />
-                    Open Site
-                  </Button>
-                </div>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyDeployLink}
+                  className="h-8 rounded-md text-xs"
+                >
+                  {isDeployLinkCopied ? (
+                    <Check className="size-3.5" />
+                  ) : (
+                    <Copy className="size-3.5" />
+                  )}
+                  {isDeployLinkCopied ? "Copied" : "Copy URL"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleOpenDeployedSite}
+                  className="h-8 rounded-md text-xs"
+                >
+                  <ExternalLink className="size-3.5" />
+                  Open Site
+                </Button>
               </div>
-            )}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
