@@ -837,7 +837,7 @@ export function ChatInterface() {
           onPaste={handlePaste}
           onKeyDown={handleKeyDown}
           placeholder={isDragging ? "Drop images here..." : "Describe your website or ask for a modification..."}
-          className="min-h-[44px] w-full resize-none border-0 bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
+          className="min-h-[44px] w-full resize-none border-0 bg-transparent dark:bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
           rows={1}
         />
 
