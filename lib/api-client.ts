@@ -23,6 +23,7 @@ export type ChatRequest = {
 
 export type StreamCallbacks = {
   onToken: (token: string) => void;
+  onReasoningToken?: (token: string) => void;
   onEvent?: (payload: unknown) => void;
   onError?: (message: string) => void;
   onDone?: () => void;
@@ -248,6 +249,23 @@ function extractToken(payload: unknown) {
   return null;
 }
 
+function extractReasoningToken(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+
+  type ChoicePayload = {
+    delta?: { reasoning_content?: unknown };
+    message?: { reasoning_content?: unknown };
+  };
+
+  const choice = (payload as { choices?: ChoicePayload[] }).choices?.[0];
+  if (!choice) return null;
+
+  if (typeof choice.delta?.reasoning_content === "string") return choice.delta.reasoning_content;
+  if (typeof choice.message?.reasoning_content === "string") return choice.message.reasoning_content;
+
+  return null;
+}
+
 export async function streamChat(
   request: ChatRequest,
   callbacks: StreamCallbacks,
@@ -307,6 +325,9 @@ export async function streamChat(
 
       const token = extractToken(parsed);
       if (token) callbacks.onToken(token);
+
+      const reasoningToken = extractReasoningToken(parsed);
+      if (reasoningToken) callbacks.onReasoningToken?.(reasoningToken);
 
       callbacks.onEvent?.(parsed);
     }

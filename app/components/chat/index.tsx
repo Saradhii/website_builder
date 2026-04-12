@@ -44,6 +44,7 @@ import {
 } from "@phosphor-icons/react";
 import { DeployDialog } from "./deploy-dialog";
 import { ModelSelectorDialog, ModelIcon } from "./model-selector";
+import { ReasoningDisplay } from "./reasoning-display";
 
 interface UploadedImage {
   id: string;
@@ -62,6 +63,7 @@ interface ConversationMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  reasoning?: string;
 }
 
 type WorkspaceView = "preview" | "code";
@@ -142,8 +144,7 @@ const SUGGESTIONS: Suggestion[] = [
   },
 ];
 
-const WEBSITE_SYSTEM_INSTRUCTIONS =
-  "You are a senior web builder assistant. Return exactly one complete HTML document with inline CSS (and inline JS only if needed). Do not include markdown explanations.";
+// System prompt is now managed server-side (api_bldr/src/prompts/website-builder.ts).
 
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -159,12 +160,14 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function createConversationMessage(
   role: ConversationMessage["role"],
-  content: string
+  content: string,
+  reasoning?: string
 ): ConversationMessage {
   return {
     id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     role,
     content,
+    ...(reasoning ? { reasoning } : {}),
   };
 }
 
@@ -202,10 +205,10 @@ function extractHtmlDocument(response: string): string | null {
 
 function buildWebsitePrompt(userPrompt: string, currentHtml?: string) {
   if (!currentHtml) {
-    return `${WEBSITE_SYSTEM_INSTRUCTIONS}\n\nUser request:\n${userPrompt}`;
+    return userPrompt;
   }
 
-  return `${WEBSITE_SYSTEM_INSTRUCTIONS}\n\nUpdate the existing website based on the user request.\n\nCurrent HTML:\n\`\`\`html\n${currentHtml}\n\`\`\`\n\nUser request:\n${userPrompt}`;
+  return `Update the existing website based on the following request.\n\nCurrent HTML:\n\`\`\`html\n${currentHtml}\n\`\`\`\n\nUser request:\n${userPrompt}`;
 }
 
 function formatRequestError(message: string) {
@@ -295,6 +298,8 @@ export function ChatInterface() {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [streamingReasoning, setStreamingReasoning] = useState("");
+  const [isReasoningPhase, setIsReasoningPhase] = useState(false);
   const [websiteId] = useState(() => createWebsiteId());
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployUrl, setDeployUrl] = useState("");
@@ -482,6 +487,8 @@ export function ChatInterface() {
       setRequestError(null);
       setIsStreaming(true);
       setStreamingText("");
+      setStreamingReasoning("");
+      setIsReasoningPhase(false);
       setWorkspaceView("code");
       setConversation((prev) => [
         ...prev,
@@ -489,6 +496,7 @@ export function ChatInterface() {
       ]);
 
       let assistantOutput = "";
+      let reasoningOutput = "";
 
       try {
         await streamChat(
@@ -501,8 +509,16 @@ export function ChatInterface() {
             onToken: (token) => {
               if (!token) return;
               if (requestIdRef.current !== requestId) return;
+              if (!assistantOutput) setIsReasoningPhase(false);
               assistantOutput += token;
               setStreamingText((prev) => prev + token);
+            },
+            onReasoningToken: (token) => {
+              if (!token) return;
+              if (requestIdRef.current !== requestId) return;
+              if (!reasoningOutput) setIsReasoningPhase(true);
+              reasoningOutput += token;
+              setStreamingReasoning((prev) => prev + token);
             },
             onError: (message) => {
               if (requestIdRef.current !== requestId) return;
@@ -522,7 +538,8 @@ export function ChatInterface() {
             ...prev,
             createConversationMessage(
               "assistant",
-              "Applied changes to the live HTML/CSS preview. Describe next edits and I will update it."
+              "Applied changes to the live HTML/CSS preview. Describe next edits and I will update it.",
+              reasoningOutput || undefined
             ),
           ]);
           return;
@@ -532,7 +549,8 @@ export function ChatInterface() {
           ...prev,
           createConversationMessage(
             "assistant",
-            assistantOutput.trim() || "No response received from the model."
+            assistantOutput.trim() || "No response received from the model.",
+            reasoningOutput || undefined
           ),
         ]);
       } catch (error) {
@@ -545,6 +563,8 @@ export function ChatInterface() {
         if (requestIdRef.current === requestId) {
           setIsStreaming(false);
           setStreamingText("");
+          setStreamingReasoning("");
+          setIsReasoningPhase(false);
         }
       }
     },
@@ -775,6 +795,7 @@ export function ChatInterface() {
     conversation,
     isStreaming,
     streamingText,
+    streamingReasoning,
     requestError,
   ]);
 
@@ -1002,23 +1023,40 @@ export function ChatInterface() {
                   className="h-full overflow-y-auto p-4 space-y-3"
                 >
                   {conversation.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "relative max-w-[95%] rounded-3xl px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap shadow-sm",
-                        message.role === "user"
-                          ? "ml-auto bg-primary text-primary-foreground rounded-br-md"
-                          : "mr-auto bg-muted text-foreground rounded-bl-md"
+                    <React.Fragment key={message.id}>
+                      {message.role === "assistant" && message.reasoning && (
+                        <ReasoningDisplay
+                          reasoning={message.reasoning}
+                          isStreaming={false}
+                        />
                       )}
-                    >
-                      {message.content}
-                    </div>
+                      <div
+                        className={cn(
+                          "relative max-w-[95%] rounded-3xl px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap shadow-sm",
+                          message.role === "user"
+                            ? "ml-auto bg-primary text-primary-foreground rounded-br-md"
+                            : "mr-auto bg-muted text-foreground rounded-bl-md"
+                        )}
+                      >
+                        {message.content}
+                      </div>
+                    </React.Fragment>
                   ))}
 
                   {isStreaming && (
-                    <div className="relative max-w-[95%] rounded-3xl rounded-bl-md px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap mr-auto bg-muted text-foreground shadow-sm">
-                      Generating website...
-                    </div>
+                    <>
+                      {streamingReasoning && (
+                        <ReasoningDisplay
+                          reasoning={streamingReasoning}
+                          isStreaming={isReasoningPhase}
+                        />
+                      )}
+                      {!isReasoningPhase && (
+                        <div className="relative max-w-[95%] rounded-3xl rounded-bl-md px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap mr-auto bg-muted text-foreground shadow-sm">
+                          Generating website...
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {requestErrorView && (
