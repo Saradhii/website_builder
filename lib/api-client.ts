@@ -194,17 +194,6 @@ export async function fetchModels(signal?: AbortSignal) {
   return data.models;
 }
 
-export async function createChat(request: ChatRequest, signal?: AbortSignal) {
-  const res = await requestWithBaseFallback("/api/ai/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...request, stream: false }),
-    signal,
-  });
-
-  return res.json();
-}
-
 type SseParseResult = {
   events: string[];
   rest: string;
