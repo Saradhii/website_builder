@@ -1104,10 +1104,10 @@ export function ChatInterface() {
                       )}
                       <div
                         className={cn(
-                          "relative max-w-[95%] rounded-3xl px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap shadow-sm",
+                          "relative max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
                           message.role === "user"
-                            ? "ml-auto bg-primary text-primary-foreground rounded-br-md"
-                            : "mr-auto bg-muted text-foreground rounded-bl-md"
+                            ? "ml-auto bg-primary text-primary-foreground rounded-br-sm"
+                            : "mr-auto bg-muted text-foreground rounded-bl-sm"
                         )}
                       >
                         {message.content}
@@ -1124,7 +1124,7 @@ export function ChatInterface() {
                         />
                       )}
                       {!isReasoningPhase && (
-                        <div className="relative max-w-[95%] rounded-3xl rounded-bl-md px-4 py-2.5 text-sm leading-7 whitespace-pre-wrap mr-auto bg-muted text-foreground shadow-sm">
+                        <div className="relative max-w-[85%] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap mr-auto bg-muted text-foreground">
                           Generating website...
                         </div>
                       )}
