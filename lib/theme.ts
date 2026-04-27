@@ -12,10 +12,10 @@ export function getSystemTheme(): ResolvedTheme {
 }
 
 export function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return "light";
   const raw = localStorage.getItem(THEME_STORAGE_KEY);
   if (raw === "light" || raw === "dark" || raw === "system") return raw;
-  return "system";
+  return "light";
 }
 
 export function resolveTheme(theme: Theme): ResolvedTheme {

@@ -92,6 +92,44 @@ const MOCK_CONVERSATION: ConversationMessage[] = [
   },
 ];
 
+const MOCK_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: #fff; min-height: 100vh; }
+    .hero { max-width: 640px; margin: 0 auto; padding: 60px 24px; text-align: center; }
+    .hero h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 12px; }
+    .hero p { font-size: 1.1rem; color: #a5b4fc; margin-bottom: 24px; }
+    .hero button { padding: 12px 28px; border: none; border-radius: 8px; background: #6366f1; color: #fff; font-size: 1rem; cursor: pointer; }
+    .section { max-width: 640px; margin: 0 auto; padding: 40px 24px; }
+    .section h2 { font-size: 1.5rem; margin-bottom: 16px; border-bottom: 1px solid #4f46e5; padding-bottom: 8px; }
+    .cards { display: grid; gap: 16px; }
+    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; }
+    .card h3 { margin-bottom: 6px; }
+    .card p { color: #a5b4fc; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <h1>Jane Doe</h1>
+    <p>Full-stack developer building delightful web experiences</p>
+    <button>View Projects</button>
+  </div>
+  <div class="section">
+    <h2>Projects</h2>
+    <div class="cards">
+      <div class="card"><h3>Taskly</h3><p>A real-time task management app built with Next.js and WebSockets.</p></div>
+      <div class="card"><h3>WeatherNow</h3><p>A beautiful weather dashboard with animated icons and 7-day forecasts.</p></div>
+      <div class="card"><h3>CodeSnap</h3><p>Screenshot tool for developers to share beautiful code snippets.</p></div>
+    </div>
+  </div>
+</body>
+</html>`;
+
 const SUGGESTIONS: Suggestion[] = [
   {
     id: "invitation",
@@ -308,6 +346,7 @@ export function ChatInterface() {
   const [isDeployLinkCopied, setIsDeployLinkCopied] = useState(false);
   const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>("chat");
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("code");
+  const [mobilePanel, setMobilePanel] = useState<"left" | "right">("left");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -320,9 +359,12 @@ export function ChatInterface() {
     if (isMockMode && !isMockReady) {
       setIsMockReady(true);
       setConversation(MOCK_CONVERSATION);
+      setPreviewHtml(MOCK_HTML);
       setHasWorkspace(true);
+      setHasPreview(true);
+      setWorkspaceView("preview");
     }
-  }, [isMockMode, isMockReady, setHasWorkspace]);
+  }, [isMockMode, isMockReady, setHasWorkspace, setHasPreview]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -990,8 +1032,38 @@ export function ChatInterface() {
 
   return (
     <>
-      <div className="flex gap-4 h-full w-full p-4">
-        <div className="w-1/2 flex flex-col rounded-2xl border border-input bg-background/90 overflow-hidden">
+      <div className="flex flex-col md:flex-row gap-2 md:gap-4 h-full w-full p-2 md:p-4">
+        <div className="flex md:hidden items-center gap-1 rounded-lg bg-muted/80 p-1">
+          <button
+            onClick={() => setMobilePanel("left")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+              mobilePanel === "left"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <MessageSquare className="size-3.5" />
+            Chat
+          </button>
+          <button
+            onClick={() => setMobilePanel("right")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+              mobilePanel === "right"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Eye className="size-3.5" />
+            Preview
+          </button>
+        </div>
+
+        <div className={cn(
+          "w-full md:w-1/2 flex flex-col rounded-2xl border border-input bg-background/90 overflow-hidden",
+          mobilePanel === "left" ? "flex-1 min-h-0" : "hidden md:flex"
+        )}>
           <Tabs
             value={leftPanelView}
             onValueChange={(value) => setLeftPanelView(value as LeftPanelView)}
@@ -1083,7 +1155,10 @@ export function ChatInterface() {
           </div>
         </div>
 
-        <div className="w-1/2 rounded-2xl border border-input bg-background/90 overflow-hidden p-4">
+        <div className={cn(
+          "w-full md:w-1/2 rounded-2xl border border-input bg-background/90 overflow-hidden p-4",
+          mobilePanel === "right" ? "flex-1 min-h-0 flex flex-col" : "hidden md:flex"
+        )}>
           <Tabs
             value={workspaceView}
             onValueChange={(value) => setWorkspaceView(value as WorkspaceView)}

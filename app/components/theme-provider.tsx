@@ -64,7 +64,7 @@ const THEME_SCRIPT = `
 (function() {
   var key = 'website_builder_theme';
   var stored = localStorage.getItem(key);
-  var dark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  var dark = stored === 'dark';
   document.documentElement.classList.toggle('dark', dark);
 })();
 `;
