@@ -41,6 +41,7 @@ import {
   Gift,
   Globe,
 } from "@phosphor-icons/react";
+import posthog from "posthog-js";
 import { DeployDialog } from "./deploy-dialog";
 import { ModelSelector } from "./model-selector";
 import { ReasoningDisplay } from "./reasoning-display";
@@ -449,6 +450,7 @@ export function ChatInterface() {
 
     if (newImages.length > 0) {
       setUploadedImages((prev) => [...prev, ...newImages]);
+      posthog.capture("image_uploaded", { image_count: newImages.length });
     }
   }, []);
 
@@ -519,6 +521,10 @@ export function ChatInterface() {
       abortControllerRef.current = controller;
       const requestId = ++requestIdRef.current;
 
+      posthog.capture("website_generation_started", {
+        model: selectedModel,
+        is_update: Boolean(previewHtml),
+      });
       setRequestError(null);
       setIsStreaming(true);
       setStreamingText("");
@@ -557,6 +563,7 @@ export function ChatInterface() {
             },
             onError: (message) => {
               if (requestIdRef.current !== requestId) return;
+              posthog.capture("generation_error", { model: selectedModel, error_message: message });
               setRequestError(message);
             },
           },
@@ -567,6 +574,11 @@ export function ChatInterface() {
 
         const html = extractHtmlDocument(assistantOutput);
         if (html) {
+          posthog.capture("website_generated", {
+            model: selectedModel,
+            is_update: Boolean(previewHtml),
+            has_reasoning: Boolean(reasoningOutput),
+          });
           setPreviewHtml(html);
           setWorkspaceView("preview");
           setConversation((prev) => [
@@ -591,9 +603,10 @@ export function ChatInterface() {
       } catch (error) {
         if (controller.signal.aborted) return;
         if (requestIdRef.current !== requestId) return;
-        setRequestError(
-          error instanceof Error ? error.message : "Something went wrong."
-        );
+        const errorMessage = error instanceof Error ? error.message : "Something went wrong.";
+        posthog.capture("generation_error", { model: selectedModel, error_message: errorMessage });
+        posthog.captureException(error instanceof Error ? error : new Error(errorMessage));
+        setRequestError(errorMessage);
       } finally {
         if (requestIdRef.current === requestId) {
           setIsStreaming(false);
@@ -618,6 +631,7 @@ export function ChatInterface() {
   const handleSuggestionClick = useCallback(
     (suggestion: Suggestion) => {
       if (isStreaming) return;
+      posthog.capture("suggestion_clicked", { suggestion_id: suggestion.id, suggestion_label: suggestion.label });
       setInputValue(suggestion.prompt);
       textareaRef.current?.focus();
     },
@@ -701,6 +715,7 @@ export function ChatInterface() {
   const handleDeployClick = useCallback(() => {
     if (!previewHtml || isDeploying) return;
 
+    posthog.capture("deploy_clicked", { website_id: websiteId });
     setIsDeploying(true);
     setDeployError(null);
     setIsDeployLinkCopied(false);
@@ -711,14 +726,15 @@ export function ChatInterface() {
       name: "website",
     })
       .then((response) => {
+        posthog.capture("deploy_succeeded", { website_id: websiteId, deploy_url: response.url });
         setDeployUrl(response.url);
         setIsDeployDialogOpen(true);
       })
       .catch((error) => {
+        const errorMessage = error instanceof Error ? error.message : "Failed to deploy website.";
+        posthog.capture("deploy_failed", { website_id: websiteId, error_message: errorMessage });
         setDeployUrl("");
-        setDeployError(
-          error instanceof Error ? error.message : "Failed to deploy website."
-        );
+        setDeployError(errorMessage);
         setIsDeployDialogOpen(true);
       })
       .finally(() => {
@@ -753,6 +769,7 @@ export function ChatInterface() {
 
     void copyWithFallback()
       .then(() => {
+        posthog.capture("deploy_link_copied", { website_id: websiteId, deploy_url: deployUrl });
         setIsDeployLinkCopied(true);
       })
       .catch((error) => {
@@ -760,16 +777,18 @@ export function ChatInterface() {
           error instanceof Error ? error.message : "Unable to copy deploy link."
         );
       });
-  }, [deployUrl]);
+  }, [deployUrl, websiteId]);
 
   const handleOpenDeployedSite = useCallback(() => {
     if (!deployUrl) return;
+    posthog.capture("deployed_site_opened", { website_id: websiteId, deploy_url: deployUrl });
     window.open(deployUrl, "_blank", "noopener,noreferrer");
-  }, [deployUrl]);
+  }, [deployUrl, websiteId]);
 
   const handleOpenFullPreview = useCallback(() => {
     if (!previewHtml) return;
 
+    posthog.capture("full_preview_opened", { website_id: websiteId });
     const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const previewWindow = window.open(url, "_blank", "noopener,noreferrer");
@@ -785,7 +804,7 @@ export function ChatInterface() {
     setTimeout(() => {
       URL.revokeObjectURL(url);
     }, 60_000);
-  }, [previewHtml]);
+  }, [previewHtml, websiteId]);
 
   useEffect(() => {
     setHasWorkspace(hasWorkspace);
@@ -917,7 +936,10 @@ export function ChatInterface() {
               modelsStatus={modelsStatus}
               modelsError={modelsError}
               selectedModel={selectedModel}
-              onValueChange={setSelectedModel}
+              onValueChange={(value) => {
+                posthog.capture("model_changed", { model: value, previous_model: selectedModel });
+                setSelectedModel(value);
+              }}
             />
           </div>
 
