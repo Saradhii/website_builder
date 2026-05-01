@@ -185,6 +185,19 @@ async function requestWithBaseFallback(path: string, init: RequestInit) {
   );
 }
 
+export type SiteInfo = {
+  id: string;
+  name: string | null;
+  updatedAt: string;
+  url: string;
+};
+
+export async function fetchSites(signal?: AbortSignal) {
+  const res = await requestWithBaseFallback("/api/websites", { signal });
+  const data = (await res.json()) as { sites: SiteInfo[] };
+  return data.sites;
+}
+
 export async function fetchModels(signal?: AbortSignal) {
   const res = await requestWithBaseFallback("/api/ai/models", { signal });
 

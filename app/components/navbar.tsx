@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import { Binary } from "@/components/animate-ui/icons/binary";
 import { Hammer } from "@/components/animate-ui/icons/hammer";
+import { Rocket } from "@/components/animate-ui/icons/rocket";
 import { AnimateIcon } from "@/components/animate-ui/icons/icon";
 
 export function Navbar() {
@@ -36,7 +37,7 @@ export function Navbar() {
             <span className="hidden h-4 w-[1px] bg-neutral-300 dark:bg-neutral-700 lg:block"></span>
           </div>
           <nav className="block">
-            <ul className="flex items-center">
+            <ul className="flex items-center gap-1">
               <li>
                 <AnimateIcon animateOnHover asChild>
                   <Link
@@ -45,6 +46,17 @@ export function Navbar() {
                   >
                     <NavIcon size={20} />
                     {navLabel}
+                  </Link>
+                </AnimateIcon>
+              </li>
+              <li>
+                <AnimateIcon animateOnHover asChild>
+                  <Link
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 transition hover:text-neutral-600 dark:hover:text-neutral-400"
+                    href="/builds"
+                  >
+                    <Rocket size={20} />
+                    BUILDS
                   </Link>
                 </AnimateIcon>
               </li>
