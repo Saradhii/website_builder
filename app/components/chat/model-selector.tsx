@@ -1,28 +1,14 @@
 "use client";
 
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { ModelInfo } from "@/lib/api-client";
-
-interface ModelSelectorDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  models: ModelInfo[];
-  modelsStatus: "idle" | "loading" | "error";
-  modelsError: string | null;
-  pendingModelSelection: string;
-  onSelectModel: (id: string) => void;
-  onApply: () => void;
-}
 
 function ModelIcon({ provider, className }: { provider: string; className?: string }) {
   switch (provider) {
@@ -58,101 +44,66 @@ function ModelIcon({ provider, className }: { provider: string; className?: stri
 
 export { ModelIcon };
 
-export function ModelSelectorDialog({
-  open,
-  onOpenChange,
+interface ModelSelectorProps {
+  models: ModelInfo[];
+  modelsStatus: "idle" | "loading" | "error";
+  modelsError: string | null;
+  selectedModel: string;
+  onValueChange: (value: string) => void;
+}
+
+export function ModelSelector({
   models,
   modelsStatus,
   modelsError,
-  pendingModelSelection,
-  onSelectModel,
-  onApply,
-}: ModelSelectorDialogProps) {
+  selectedModel,
+  onValueChange,
+}: ModelSelectorProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 sm:max-w-md">
-        <DialogHeader className="px-4 pt-4 pb-2">
-          <DialogTitle className="text-sm">Select model</DialogTitle>
-          <DialogDescription className="text-xs">
-            Choose one model for website generation.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="max-h-[60vh] overflow-y-auto p-3">
-          {modelsStatus === "loading" && (
-            <span className="block px-2 py-1 text-xs text-muted-foreground">
-              Loading models...
-            </span>
-          )}
-          {modelsStatus === "error" && (
-            <span className="block px-2 py-1 text-xs text-destructive">
-              {modelsError ?? "Failed to load models."}
-            </span>
-          )}
-          {modelsStatus !== "loading" && models.length === 0 && modelsStatus !== "error" && (
-            <span className="block px-2 py-1 text-xs text-muted-foreground">
-              No models available.
-            </span>
-          )}
-          <div className="flex flex-col gap-1.5">
-            {models.map((model) => {
-              const isSelected = pendingModelSelection === model.id;
-              return (
-                <div
-                  key={model.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={isSelected}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
-                    isSelected
-                      ? "border-primary/30 bg-accent"
-                      : "border-transparent hover:bg-accent/60"
-                  )}
-                  onClick={() => onSelectModel(model.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelectModel(model.id);
-                    }
-                  }}
-                >
-                  <span
-                    className={cn(
-                      "flex size-4 shrink-0 items-center justify-center rounded-full border",
-                      isSelected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input"
-                    )}
-                    aria-hidden="true"
-                  >
-                    {isSelected && <Check className="size-2.5" />}
-                  </span>
-                  <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  <span className="text-xs sm:text-sm">{model.name}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <DialogFooter className="border-t border-input px-3 py-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 rounded-md text-xs"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            className="h-8 rounded-md text-xs"
-            onClick={onApply}
-            disabled={!pendingModelSelection}
-          >
-            Apply Selection
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Select value={selectedModel} onValueChange={onValueChange}>
+      <SelectTrigger
+        className={cn(
+          "h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent w-auto",
+          "data-[placeholder]:text-muted-foreground"
+        )}
+      >
+        {models.find((m) => m.id === selectedModel) && (
+          <ModelIcon
+            provider={models.find((m) => m.id === selectedModel)!.provider}
+            className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+          />
+        )}
+        <SelectValue className="text-xs sm:text-sm truncate max-w-[110px] sm:max-w-none">
+          {modelsStatus === "loading"
+            ? "Loading models..."
+            : models.find((m) => m.id === selectedModel)?.name ?? "Select a model"}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent position="popper" side="bottom" align="start" sideOffset={4}>
+        {modelsStatus === "loading" && (
+          <SelectItem value="__loading" disabled>
+            Loading models...
+          </SelectItem>
+        )}
+        {modelsStatus === "error" && (
+          <SelectItem value="__error" disabled>
+            {modelsError ?? "Failed to load models."}
+          </SelectItem>
+        )}
+        {modelsStatus !== "loading" && models.length === 0 && modelsStatus !== "error" && (
+          <SelectItem value="__empty" disabled>
+            No models available.
+          </SelectItem>
+        )}
+        {models.map((model) => (
+          <SelectItem key={model.id} value={model.id}>
+            <div className="flex items-center gap-2">
+              <ModelIcon provider={model.provider} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>{model.name}</span>
+            </div>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

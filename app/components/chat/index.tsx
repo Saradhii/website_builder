@@ -24,7 +24,6 @@ import { deployWebsite } from "@/lib/deploy-client";
 import {
   AlertTriangle,
   ArrowUp,
-  ChevronDown,
   Code2,
   Eye,
   ExternalLink,
@@ -43,7 +42,7 @@ import {
   Globe,
 } from "@phosphor-icons/react";
 import { DeployDialog } from "./deploy-dialog";
-import { ModelSelectorDialog, ModelIcon } from "./model-selector";
+import { ModelSelector } from "./model-selector";
 import { ReasoningDisplay } from "./reasoning-display";
 
 interface UploadedImage {
@@ -327,8 +326,6 @@ export function ChatInterface() {
   const [modelsStatus, setModelsStatus] = useState<"idle" | "loading" | "error">("idle");
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState("");
-  const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
-  const [pendingModelSelection, setPendingModelSelection] = useState("");
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
@@ -365,6 +362,10 @@ export function ChatInterface() {
       setWorkspaceView("preview");
     }
   }, [isMockMode, isMockReady, setHasWorkspace, setHasPreview]);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -418,14 +419,6 @@ export function ChatInterface() {
       controller.abort();
     };
   }, []);
-
-  useEffect(() => {
-    if (isModelDialogOpen) {
-      setPendingModelSelection(selectedModel);
-    }
-  }, [isModelDialogOpen, selectedModel]);
-
-  const selectedModelData = models.find((m: ModelInfo) => m.id === selectedModel);
 
   const validateFile = (file: File): boolean => {
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
@@ -617,14 +610,10 @@ export function ChatInterface() {
     const prompt = inputValue.trim();
     if (!prompt) return;
     setInputValue("");
+    uploadedImages.forEach((img) => URL.revokeObjectURL(img.preview));
+    setUploadedImages([]);
     void sendPrompt(prompt);
-  }, [inputValue, sendPrompt]);
-
-  const handleApplyModelSelection = useCallback(() => {
-    if (!pendingModelSelection) return;
-    setSelectedModel(pendingModelSelection);
-    setIsModelDialogOpen(false);
-  }, [pendingModelSelection]);
+  }, [inputValue, sendPrompt, uploadedImages]);
 
   const handleSuggestionClick = useCallback(
     (suggestion: Suggestion) => {
@@ -857,7 +846,7 @@ export function ChatInterface() {
       <div
         ref={containerRef}
         className={cn(
-          "border-input bg-background/90 cursor-text rounded-3xl border p-2 sm:p-3 transition-colors",
+          "border-input bg-background/90 cursor-text rounded-3xl border p-0 pt-1 transition-colors",
           isDragging && "border-primary bg-primary/5"
         )}
         onClick={() => textareaRef.current?.focus()}
@@ -866,7 +855,7 @@ export function ChatInterface() {
         onDrop={handleDrop}
       >
         {uploadedImages.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2 px-3 sm:px-4">
+          <div className="flex flex-wrap gap-2 mb-1.5 px-2 sm:px-2.5">
             {uploadedImages.map((image) => (
               <div
                 key={image.id}
@@ -899,12 +888,12 @@ export function ChatInterface() {
           onChange={(e) => setInputValue(e.target.value)}
           onPaste={handlePaste}
           onKeyDown={handleKeyDown}
-          placeholder={isDragging ? "Drop images here..." : "Describe your website or ask for a modification..."}
-          className="min-h-[44px] w-full resize-none border-0 bg-transparent dark:bg-transparent text-sm sm:text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-3 sm:px-4 pt-2 sm:pt-3 pb-1"
+          placeholder={isDragging ? "Drop images here..." : "What do you want to build?"}
+          className="min-h-[44px] w-full resize-none border-0 bg-transparent dark:bg-transparent text-base sm:text-lg placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-4 pt-3 pb-1"
           rows={1}
         />
 
-        <div className="flex items-center justify-between mt-2 px-1 sm:px-2 pb-1">
+        <div className="flex items-center justify-between mt-3 p-2">
           <div className="flex items-center gap-1 sm:gap-2">
             <input
               ref={fileInputRef}
@@ -923,35 +912,12 @@ export function ChatInterface() {
               <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
 
-            <Button
-              variant="outline"
-              onClick={() => setIsModelDialogOpen(true)}
-              className="h-8 sm:h-9 rounded-full border border-input bg-background px-2 sm:px-3 gap-1.5 sm:gap-2 hover:bg-accent"
-            >
-              {selectedModelData && (
-                <ModelIcon
-                  provider={selectedModelData.provider}
-                  className="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                />
-              )}
-              <span className="text-xs sm:text-sm truncate max-w-[110px] sm:max-w-none">
-                {selectedModelData?.name ??
-                  (modelsStatus === "loading"
-                    ? "Loading models..."
-                    : "Select a model")}
-              </span>
-              <ChevronDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />
-            </Button>
-
-            <ModelSelectorDialog
-              open={isModelDialogOpen}
-              onOpenChange={setIsModelDialogOpen}
+            <ModelSelector
               models={models}
               modelsStatus={modelsStatus}
               modelsError={modelsError}
-              pendingModelSelection={pendingModelSelection}
-              onSelectModel={setPendingModelSelection}
-              onApply={handleApplyModelSelection}
+              selectedModel={selectedModel}
+              onValueChange={setSelectedModel}
             />
           </div>
 
@@ -1156,8 +1122,8 @@ export function ChatInterface() {
         </div>
 
         <div className={cn(
-          "w-full md:w-1/2 rounded-2xl border border-input bg-background/90 overflow-hidden p-4",
-          mobilePanel === "right" ? "flex-1 min-h-0 flex flex-col" : "hidden md:flex"
+          "w-full md:w-1/2 flex flex-col rounded-2xl border border-input bg-background/90 overflow-hidden p-4",
+          mobilePanel === "right" ? "flex-1 min-h-0" : "hidden md:flex"
         )}>
           <Tabs
             value={workspaceView}
