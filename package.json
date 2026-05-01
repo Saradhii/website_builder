@@ -16,6 +16,7 @@
     "monaco-editor": "^0.55.1",
     "motion": "^12.34.3",
     "next": "16.1.6",
+    "posthog-js": "^1.372.5",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
